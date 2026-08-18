@@ -49,8 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 request.onsuccess = async () => {
                     let items = request.result;
                     const initialized = localStorage.getItem('umubavu_db_init');
-                    if (!initialized || items.length === 0) {
-                        // Populate default items first time
+                    if (!initialized) {
+                        // Populate default items ONLY ONCE on first initialization
                         for (const item of DEFAULT_ITEMS) {
                             await saveGalleryItem(item);
                         }
