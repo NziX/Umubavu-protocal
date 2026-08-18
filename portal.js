@@ -56,18 +56,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dropZone.addEventListener('click', () => fileInput.click());
 
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
+    // 1. Prevent default drag behaviors window-wide to prevent browser from navigating/opening files on accidental drops
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        window.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
     });
 
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    // 2. Add visual effects to the Drop Zone card on dragenter and dragover
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.add('dragover');
+        }, false);
+    });
 
+    // 3. Remove visual effects on dragleave and drop
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.remove('dragover');
+        }, false);
+    });
+
+    // 4. Handle dropped file in the drop zone
     dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) {
-            handleFileSelect(e.dataTransfer.files[0]);
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length > 0) {
+            handleFileSelect(dt.files[0]);
         }
     });
 
