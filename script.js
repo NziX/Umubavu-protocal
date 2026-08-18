@@ -134,19 +134,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const eventLocation = document.getElementById('event-location').value.trim();
             const recommendedStaff = recStaffElement.textContent;
 
-            // ── Save booking to Firebase Firestore ──
-            db.collection('bookings').add({
-                name: clientName,
-                phone: clientPhone,
-                service: eventType,
-                guests: guestCount,
-                eventDate: eventDate || 'To be specified',
-                venue: eventLocation,
-                staffSuggested: recommendedStaff,
-                contacted: false,
-                submittedAt: new Date().toLocaleString('en-GB'),
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).catch(err => console.error("Error saving booking to Firestore: ", err));
+            // ── Save booking to Firebase Firestore Safely ──
+            try {
+                if (typeof db !== 'undefined' && db && typeof firebase !== 'undefined') {
+                    db.collection('bookings').add({
+                        name: clientName,
+                        phone: clientPhone,
+                        service: eventType,
+                        guests: guestCount,
+                        eventDate: eventDate || 'To be specified',
+                        venue: eventLocation,
+                        staffSuggested: recommendedStaff,
+                        contacted: false,
+                        submittedAt: new Date().toLocaleString('en-GB'),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }).catch(err => console.error("Error saving booking to Firestore: ", err));
+                }
+            } catch (err) {
+                console.warn("Firebase save bypassed/failed:", err);
+            }
 
             const message = `Hello *Umubavu Protocol*! 🌟\nI would like to request an event protocol & ushering quote.\n\n` +
                 `👤 *Client Name:* ${clientName}\n` +
@@ -177,16 +183,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const phone = document.getElementById('contact-phone-direct').value.trim();
             const messageText = document.getElementById('contact-message').value.trim();
 
-            // ── Save contact inquiry to Firebase Firestore ──
-            db.collection('contact_inquiries').add({
-                name: name,
-                email: email,
-                phone: phone,
-                message: messageText,
-                contacted: false,
-                submittedAt: new Date().toLocaleString('en-GB'),
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).catch(err => console.error("Error saving inquiry to Firestore: ", err));
+            // ── Save contact inquiry to Firebase Firestore Safely ──
+            try {
+                if (typeof db !== 'undefined' && db && typeof firebase !== 'undefined') {
+                    db.collection('contact_inquiries').add({
+                        name: name,
+                        email: email,
+                        phone: phone,
+                        message: messageText,
+                        contacted: false,
+                        submittedAt: new Date().toLocaleString('en-GB'),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }).catch(err => console.error("Error saving inquiry to Firestore: ", err));
+                }
+            } catch (err) {
+                console.warn("Firebase save bypassed/failed:", err);
+            }
 
             const formattedMessage = `Hello *Umubavu Protocol*,\n` +
                 `Inquiry from Website Form:\n` +
