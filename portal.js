@@ -130,8 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
         dropZone.style.display = 'block';
     });
 
-    // --- Image Compression Utility ---
-    function compressImage(file, maxWidth, quality) {
+    // --- Image Compression Utility (returns base64 data URL) ---
+    function compressImageToDataUrl(file, maxWidth, quality) {
         return new Promise((resolve) => {
             const img = new Image();
             const url = URL.createObjectURL(file);
@@ -146,19 +146,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 canvas.width = w;
                 canvas.height = h;
                 canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                canvas.toBlob((blob) => {
-                    resolve(blob);
-                }, 'image/jpeg', quality);
+                const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve(dataUrl);
             };
             img.onerror = () => {
                 URL.revokeObjectURL(url);
-                resolve(file); // Fallback: upload original if compression fails
+                // Fallback: read original file as data URL
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(file);
             };
             img.src = url;
         });
     }
 
-    // --- Media Upload Submission (to Firebase Storage & Firestore) ---
+    // --- Media Upload Submission (direct to Firestore — no Firebase Storage needed) ---
     const uploadForm = document.getElementById('upload-form');
 
     uploadForm.addEventListener('submit', async (e) => {
@@ -169,114 +172,71 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Block videos — Firestore has a 1MB document limit, videos are too large
+        if (currentFileType === 'video') {
+            alert('⚠️ Video uploads are not supported on the free plan.\n\nOnly photos can be uploaded. To share event videos, upload them to YouTube or Instagram and link them from there.');
+            return;
+        }
+
         submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i class="fas fa-compress"></i> Compressing image...`;
 
         try {
             const title = document.getElementById('media-title').value.trim();
             const category = document.getElementById('media-category').value;
             const venue = document.getElementById('media-venue').value.trim();
 
-            // Compress images before upload (max 1600px wide, 75% JPEG quality)
-            let fileToUpload = selectedFile;
-            if (currentFileType === 'image') {
-                submitBtn.innerHTML = `<i class="fas fa-compress"></i> Compressing image...`;
-                const originalSize = selectedFile.size;
-                fileToUpload = await compressImage(selectedFile, 1600, 0.75);
-                const savedPct = Math.round((1 - fileToUpload.size / originalSize) * 100);
-                console.log(`Compressed: ${(originalSize/1024/1024).toFixed(1)}MB → ${(fileToUpload.size/1024/1024).toFixed(1)}MB (saved ${savedPct}%)`);
+            // Compress image to base64 data URL (max 1200px wide, 70% quality)
+            const originalSize = selectedFile.size;
+            const dataUrl = await compressImageToDataUrl(selectedFile, 1200, 0.70);
+
+            if (!dataUrl) {
+                throw new Error('Failed to process image. Please try a different file.');
             }
 
-            const fileId = 'up_' + Date.now();
-            const extension = currentFileType === 'video' ? (selectedFile.name.split('.').pop() || 'mp4') : 'jpg';
-            const storagePath = `gallery/${fileId}.${extension}`;
-            const storageRef = storage.ref().child(storagePath);
+            // Check size — Firestore documents max at ~1MB
+            const dataSize = dataUrl.length;
+            const dataSizeMB = (dataSize / 1024 / 1024).toFixed(2);
+            console.log(`Compressed: ${(originalSize/1024/1024).toFixed(1)}MB → ${dataSizeMB}MB data URL`);
 
-            // Set explicit content type metadata (required for compressed blobs)
-            const contentType = currentFileType === 'video' ? (selectedFile.type || 'video/mp4') : 'image/jpeg';
-            const metadata = { contentType: contentType };
-
-            // Upload with progress tracking and explicit metadata
-            const uploadTask = storageRef.put(fileToUpload, metadata);
-
-            // Stall detector — if 0% after 20 seconds, likely a Firebase rules/permissions issue
-            let lastProgress = 0;
-            const stallTimer = setTimeout(() => {
-                if (lastProgress === 0) {
-                    uploadTask.cancel();
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
-                    alert(
-                        '⚠️ Upload is blocked (stuck at 0%).\n\n' +
-                        'This usually means your Firebase Storage security rules have expired.\n\n' +
-                        'To fix:\n' +
-                        '1. Go to console.firebase.google.com\n' +
-                        '2. Open your project "umubavu-protocol"\n' +
-                        '3. Click Storage → Rules tab\n' +
-                        '4. Replace the rules with:\n\n' +
-                        'rules_version = \'2\';\n' +
-                        'service firebase.storage {\n' +
-                        '  match /b/{bucket}/o {\n' +
-                        '    match /{allPaths=**} {\n' +
-                        '      allow read, write: if true;\n' +
-                        '    }\n' +
-                        '  }\n' +
-                        '}\n\n' +
-                        '5. Click "Publish" and try uploading again.'
-                    );
+            if (dataSize > 900000) {
+                // Try harder compression
+                submitBtn.innerHTML = `<i class="fas fa-compress"></i> Extra compression...`;
+                const smallerDataUrl = await compressImageToDataUrl(selectedFile, 800, 0.50);
+                if (smallerDataUrl && smallerDataUrl.length <= 900000) {
+                    // Use the smaller version
+                    await saveToFirestore(smallerDataUrl);
+                } else {
+                    alert('This image is too large even after compression. Please use a smaller photo or crop it before uploading.');
+                    return;
                 }
-            }, 20000);
+            } else {
+                await saveToFirestore(dataUrl);
+            }
 
-            uploadTask.on('state_changed',
-                (snapshot) => {
-                    lastProgress = snapshot.bytesTransferred;
-                    const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-                    const mbDone = (snapshot.bytesTransferred / 1024 / 1024).toFixed(1);
-                    const mbTotal = (snapshot.totalBytes / 1024 / 1024).toFixed(1);
-                    submitBtn.innerHTML = `
-                        <div style="width:100%;text-align:center;">
-                            <div style="margin-bottom:4px;font-size:0.85rem;">Uploading ${mbDone} / ${mbTotal} MB</div>
-                            <div style="background:rgba(0,0,0,0.3);border-radius:6px;height:8px;overflow:hidden;">
-                                <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#d4af37,#f0d060);border-radius:6px;transition:width 0.3s;"></div>
-                            </div>
-                            <div style="margin-top:3px;font-size:0.75rem;opacity:0.8;">${pct}%</div>
-                        </div>`;
-                },
-                (err) => {
-                    clearTimeout(stallTimer);
-                    console.error('Upload Error:', err);
-                    if (err.code === 'storage/canceled') return; // Stall timer already handled this
-                    alert('Upload failed: ' + err.message + '\n\nCheck your Firebase Storage rules in the Firebase console.');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
-                },
-                async () => {
-                    clearTimeout(stallTimer);
-                    // Upload complete — save metadata to Firestore
-                    submitBtn.innerHTML = `<i class="fas fa-check"></i> Saving to database...`;
-                    const downloadUrl = await uploadTask.snapshot.ref.getDownloadURL();
+            async function saveToFirestore(imageDataUrl) {
+                submitBtn.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Saving to database...`;
 
-                    await db.collection('gallery_items').doc(fileId).set({
-                        title: title,
-                        category: category,
-                        venue: venue,
-                        type: currentFileType,
-                        url: downloadUrl,
-                        storagePath: storagePath,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                const fileId = 'up_' + Date.now();
+                await db.collection('gallery_items').doc(fileId).set({
+                    title: title,
+                    category: category,
+                    venue: venue,
+                    type: 'image',
+                    url: imageDataUrl,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
 
-                    alert('Media published successfully! Your photo/video is now live on the website gallery.');
+                alert('✅ Photo published successfully! It is now live on the website gallery.');
 
-                    // Reset form UI
-                    uploadForm.reset();
-                    clearPreviewBtn.click();
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
-                }
-            );
+                // Reset form UI
+                uploadForm.reset();
+                clearPreviewBtn.click();
+            }
         } catch (err) {
             console.error('Upload Error:', err);
-            alert('Error saving media: ' + err.message);
+            alert('Error saving: ' + err.message);
+        } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
         }
@@ -339,24 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deleteMediaItem = async function(id) {
         if (confirm('Are you sure you want to delete this media item? It will be removed permanently.')) {
             try {
-                const docRef = db.collection('gallery_items').doc(id);
-                const doc = await docRef.get();
-
-                if (doc.exists) {
-                    const itemData = doc.data();
-
-                    // If it has a Storage reference, delete the physical file too
-                    if (itemData.storagePath) {
-                        try {
-                            await storage.ref().child(itemData.storagePath).delete();
-                        } catch (storageErr) {
-                            console.warn("Storage deletion warning (file may not exist in cloud bucket):", storageErr);
-                        }
-                    }
-
-                    // Delete database entry
-                    await docRef.delete();
-                }
+                await db.collection('gallery_items').doc(id).delete();
             } catch (err) {
                 console.error("Delete Action Error:", err);
                 alert("Failed to delete media item: " + err.message);
