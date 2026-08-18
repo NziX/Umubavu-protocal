@@ -191,11 +191,44 @@ document.addEventListener('DOMContentLoaded', () => {
             const storagePath = `gallery/${fileId}.${extension}`;
             const storageRef = storage.ref().child(storagePath);
 
-            // Upload with progress tracking
-            const uploadTask = storageRef.put(fileToUpload);
+            // Set explicit content type metadata (required for compressed blobs)
+            const contentType = currentFileType === 'video' ? (selectedFile.type || 'video/mp4') : 'image/jpeg';
+            const metadata = { contentType: contentType };
+
+            // Upload with progress tracking and explicit metadata
+            const uploadTask = storageRef.put(fileToUpload, metadata);
+
+            // Stall detector — if 0% after 20 seconds, likely a Firebase rules/permissions issue
+            let lastProgress = 0;
+            const stallTimer = setTimeout(() => {
+                if (lastProgress === 0) {
+                    uploadTask.cancel();
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
+                    alert(
+                        '⚠️ Upload is blocked (stuck at 0%).\n\n' +
+                        'This usually means your Firebase Storage security rules have expired.\n\n' +
+                        'To fix:\n' +
+                        '1. Go to console.firebase.google.com\n' +
+                        '2. Open your project "umubavu-protocol"\n' +
+                        '3. Click Storage → Rules tab\n' +
+                        '4. Replace the rules with:\n\n' +
+                        'rules_version = \'2\';\n' +
+                        'service firebase.storage {\n' +
+                        '  match /b/{bucket}/o {\n' +
+                        '    match /{allPaths=**} {\n' +
+                        '      allow read, write: if true;\n' +
+                        '    }\n' +
+                        '  }\n' +
+                        '}\n\n' +
+                        '5. Click "Publish" and try uploading again.'
+                    );
+                }
+            }, 20000);
 
             uploadTask.on('state_changed',
                 (snapshot) => {
+                    lastProgress = snapshot.bytesTransferred;
                     const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
                     const mbDone = (snapshot.bytesTransferred / 1024 / 1024).toFixed(1);
                     const mbTotal = (snapshot.totalBytes / 1024 / 1024).toFixed(1);
@@ -209,12 +242,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>`;
                 },
                 (err) => {
+                    clearTimeout(stallTimer);
                     console.error('Upload Error:', err);
-                    alert('Upload failed: ' + err.message);
+                    if (err.code === 'storage/canceled') return; // Stall timer already handled this
+                    alert('Upload failed: ' + err.message + '\n\nCheck your Firebase Storage rules in the Firebase console.');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
                 },
                 async () => {
+                    clearTimeout(stallTimer);
                     // Upload complete — save metadata to Firestore
                     submitBtn.innerHTML = `<i class="fas fa-check"></i> Saving to database...`;
                     const downloadUrl = await uploadTask.snapshot.ref.getDownloadURL();
