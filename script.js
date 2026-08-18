@@ -233,7 +233,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         galleryGrid.innerHTML = items.map((item, index) => `
                             <div class="gallery-item" data-index="${index}" style="cursor:pointer;">
                                 ${item.type === 'video'
-                                    ? `<video src="${item.url}" preload="metadata" style="width:100%;height:100%;object-fit:cover;pointer-events:none;"></video><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:50px;height:50px;border-radius:50%;background:rgba(212,175,55,0.85);color:#000;display:flex;align-items:center;justify-content:center;font-size:1.2rem;box-shadow:0 4px 15px rgba(0,0,0,0.5);"><i class="fas fa-play" style="margin-left:3px;"></i></div>`
+                                    ? `<video src="${item.url}" preload="metadata" muted playsinline></video>
+                                       <div class="video-play-btn"><i class="fas fa-play" style="margin-left:3px;"></i></div>`
                                     : `<img src="${item.url}" alt="${escapeHtml(item.title)}">`
                                 }
                                 <div class="gallery-overlay">
@@ -269,9 +270,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!lightboxModal) return;
 
         if (item.type === 'video') {
-            lightboxContent.innerHTML = `<video src="${item.url}" controls autoplay style="max-height: 75vh; width: 100%; border-radius: 12px;"></video>`;
+            // Render at 760p (1352x760) quality - controls, autoplay, explicit dimensions
+            lightboxContent.innerHTML = `
+                <video 
+                    src="${item.url}" 
+                    controls 
+                    autoplay 
+                    playsinline
+                    width="1352" 
+                    height="760"
+                    style="width:100%; height:100%; object-fit:contain; background:#000; display:block; border-radius:12px;"
+                ></video>`;
         } else {
-            lightboxContent.innerHTML = `<img src="${item.url}" alt="${escapeHtml(item.title)}" style="max-height: 75vh; max-width: 100%; object-fit: contain; border-radius: 12px;">`;
+            lightboxContent.innerHTML = `
+                <img 
+                    src="${item.url}" 
+                    alt="${escapeHtml(item.title)}" 
+                    style="width:100%; height:100%; object-fit:contain; display:block; border-radius:12px;"
+                >`;
         }
 
         lightboxCaption.innerHTML = `
@@ -280,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         lightboxModal.classList.add('active');
-        document.body.style.overflow = 'hidden'; // Prevent scrolling
+        document.body.style.overflow = 'hidden';
     }
 
     function closeLightbox() {
