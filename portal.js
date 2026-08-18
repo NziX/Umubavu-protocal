@@ -130,6 +130,34 @@ document.addEventListener('DOMContentLoaded', () => {
         dropZone.style.display = 'block';
     });
 
+    // --- Image Compression Utility ---
+    function compressImage(file, maxWidth, quality) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if (w > maxWidth) {
+                    h = Math.round(h * maxWidth / w);
+                    w = maxWidth;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                resolve(file); // Fallback: upload original if compression fails
+            };
+            img.src = url;
+        });
+    }
+
     // --- Media Upload Submission (to Firebase Storage & Firestore) ---
     const uploadForm = document.getElementById('upload-form');
 
@@ -142,42 +170,77 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         submitBtn.disabled = true;
-        submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Uploading to Cloud...`;
 
         try {
             const title = document.getElementById('media-title').value.trim();
             const category = document.getElementById('media-category').value;
             const venue = document.getElementById('media-venue').value.trim();
 
+            // Compress images before upload (max 1600px wide, 75% JPEG quality)
+            let fileToUpload = selectedFile;
+            if (currentFileType === 'image') {
+                submitBtn.innerHTML = `<i class="fas fa-compress"></i> Compressing image...`;
+                const originalSize = selectedFile.size;
+                fileToUpload = await compressImage(selectedFile, 1600, 0.75);
+                const savedPct = Math.round((1 - fileToUpload.size / originalSize) * 100);
+                console.log(`Compressed: ${(originalSize/1024/1024).toFixed(1)}MB → ${(fileToUpload.size/1024/1024).toFixed(1)}MB (saved ${savedPct}%)`);
+            }
+
             const fileId = 'up_' + Date.now();
-            const extension = selectedFile.name.split('.').pop() || (currentFileType === 'video' ? 'mp4' : 'jpg');
+            const extension = currentFileType === 'video' ? (selectedFile.name.split('.').pop() || 'mp4') : 'jpg';
             const storagePath = `gallery/${fileId}.${extension}`;
             const storageRef = storage.ref().child(storagePath);
 
-            // 1. Upload file object to Firebase Storage
-            const uploadSnapshot = await storageRef.put(selectedFile);
-            const downloadUrl = await uploadSnapshot.ref.getDownloadURL();
+            // Upload with progress tracking
+            const uploadTask = storageRef.put(fileToUpload);
 
-            // 2. Write metadata & URL to Cloud Firestore database
-            await db.collection('gallery_items').doc(fileId).set({
-                title: title,
-                category: category,
-                venue: venue,
-                type: currentFileType,
-                url: downloadUrl,
-                storagePath: storagePath,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                    const mbDone = (snapshot.bytesTransferred / 1024 / 1024).toFixed(1);
+                    const mbTotal = (snapshot.totalBytes / 1024 / 1024).toFixed(1);
+                    submitBtn.innerHTML = `
+                        <div style="width:100%;text-align:center;">
+                            <div style="margin-bottom:4px;font-size:0.85rem;">Uploading ${mbDone} / ${mbTotal} MB</div>
+                            <div style="background:rgba(0,0,0,0.3);border-radius:6px;height:8px;overflow:hidden;">
+                                <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#d4af37,#f0d060);border-radius:6px;transition:width 0.3s;"></div>
+                            </div>
+                            <div style="margin-top:3px;font-size:0.75rem;opacity:0.8;">${pct}%</div>
+                        </div>`;
+                },
+                (err) => {
+                    console.error('Upload Error:', err);
+                    alert('Upload failed: ' + err.message);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
+                },
+                async () => {
+                    // Upload complete — save metadata to Firestore
+                    submitBtn.innerHTML = `<i class="fas fa-check"></i> Saving to database...`;
+                    const downloadUrl = await uploadTask.snapshot.ref.getDownloadURL();
 
-            alert('Media published successfully! Your photo/video is now live on the website gallery.');
+                    await db.collection('gallery_items').doc(fileId).set({
+                        title: title,
+                        category: category,
+                        venue: venue,
+                        type: currentFileType,
+                        url: downloadUrl,
+                        storagePath: storagePath,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
 
-            // Reset form UI
-            uploadForm.reset();
-            clearPreviewBtn.click();
+                    alert('Media published successfully! Your photo/video is now live on the website gallery.');
+
+                    // Reset form UI
+                    uploadForm.reset();
+                    clearPreviewBtn.click();
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
+                }
+            );
         } catch (err) {
             console.error('Upload Error:', err);
             alert('Error saving media: ' + err.message);
-        } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
         }
