@@ -250,4 +250,155 @@ document.addEventListener('DOMContentLoaded', () => {
     function escapeHtml(str) {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+
+    // ============================================================
+    // CLOUD BOOKINGS SECTION (Firestore Sync)
+    // ============================================================
+    let bookingsListenerUnsubscribe = null;
+
+    function setupRealtimeBookingsListener() {
+        if (bookingsListenerUnsubscribe) return;
+
+        const list = document.getElementById('bookings-list');
+        const badge = document.getElementById('booking-badge');
+        if (!list) return;
+
+        bookingsListenerUnsubscribe = db.collection('bookings')
+            .orderBy('createdAt', 'desc')
+            .onSnapshot((snapshot) => {
+                let bookings = [];
+                snapshot.forEach(doc => {
+                    bookings.push({ id: doc.id, ...doc.data() });
+                });
+
+                if (badge) {
+                    badge.textContent = bookings.length;
+                }
+
+                if (bookings.length === 0) {
+                    list.innerHTML = `
+                        <div style="text-align:center; padding:3rem; color:var(--text-muted);">
+                            <i class="fas fa-inbox" style="font-size:2.5rem; color:var(--primary-gold); margin-bottom:1rem; display:block;"></i>
+                            <p>No bookings yet. Booking requests from the website will appear here in real-time.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                list.innerHTML = bookings.map(b => `
+                    <div class="booking-row" id="booking-${b.id}">
+                        <div>
+                            <div class="booking-label"><i class="fas fa-user"></i> Client Name</div>
+                            <div class="booking-value">${escapeHtml(b.name || '—')}</div>
+                            <div style="margin-top:0.4rem;">
+                                <div class="booking-label"><i class="fas fa-phone"></i> Phone / WhatsApp</div>
+                                <div class="booking-value">
+                                    <a href="https://wa.me/${(b.phone || '').replace(/\s+/g, '')}" target="_blank"
+                                       style="color:var(--primary-gold);text-decoration:none;font-weight:600;">
+                                        <i class="fab fa-whatsapp"></i> ${escapeHtml(b.phone || '—')}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="booking-label"><i class="fas fa-calendar-alt"></i> Event Date</div>
+                            <div class="booking-value">${escapeHtml(b.eventDate || '—')}</div>
+                            <div style="margin-top:0.4rem;">
+                                <div class="booking-label"><i class="fas fa-map-marker-alt"></i> Venue & Guests</div>
+                                <div class="booking-value">${escapeHtml(b.venue || '—')} (${escapeHtml(String(b.guests || '0'))} guests)</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="booking-label"><i class="fas fa-concierge-bell"></i> Service & Staff</div>
+                            <div class="booking-value">${escapeHtml(b.service || '—')} (${escapeHtml(b.staffSuggested || '—')} staff)</div>
+                            <div style="margin-top:0.4rem;">
+                                <div class="booking-label"><i class="fas fa-clock"></i> Submitted</div>
+                                <div class="booking-value" style="font-size:0.85rem; color:var(--text-secondary);">${b.submittedAt || '—'}</div>
+                            </div>
+                        </div>
+                        <div class="booking-actions">
+                            <span class="status-badge ${b.contacted ? 'status-done' : 'status-new'}" 
+                                  onclick="toggleContacted('${b.id}', ${b.contacted})" 
+                                  style="cursor:pointer; user-select:none; text-align:center;" 
+                                  title="Click to toggle contacted status">
+                                ${b.contacted ? '✓ Contacted' : '⏳ New'}
+                            </span>
+                            <button onclick="deleteBooking('${b.id}')" class="btn btn-danger" style="font-size:0.78rem; padding:0.35rem 0.8rem;">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }, (err) => {
+                console.error("Firestore Bookings Listen Error:", err);
+            });
+    }
+
+    // Toggle contacted status in Firestore
+    window.toggleContacted = async function(id, currentStatus) {
+        try {
+            await db.collection('bookings').doc(id).update({
+                contacted: !currentStatus
+            });
+        } catch (err) {
+            console.error("Error updating booking status:", err);
+            alert("Failed to update status: " + err.message);
+        }
+    };
+
+    // Delete single booking from Firestore
+    window.deleteBooking = async function(id) {
+        if (confirm('Are you sure you want to remove this booking request from the portal?')) {
+            try {
+                await db.collection('bookings').doc(id).delete();
+            } catch (err) {
+                console.error("Error deleting booking:", err);
+                alert("Failed to delete booking: " + err.message);
+            }
+        }
+    };
+
+    // Clear all bookings from Firestore
+    window.clearAllBookings = async function() {
+        if (confirm('Are you sure you want to delete ALL booking records permanently? This cannot be undone.')) {
+            try {
+                const snapshot = await db.collection('bookings').get();
+                const batch = db.batch();
+                snapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                alert('All bookings cleared successfully.');
+            } catch (err) {
+                console.error("Error clearing bookings:", err);
+                alert("Failed to clear bookings: " + err.message);
+            }
+        }
+    };
+
+    // --- Tab Switcher Logic ---
+    window.switchTab = function(tab) {
+        const tabs = ['media', 'bookings'];
+        tabs.forEach(t => {
+            const btn = document.getElementById('tab-' + t);
+            if (btn) btn.classList.toggle('active', t === tab);
+            
+            const panel = document.getElementById('panel-' + t);
+            if (panel) panel.style.display = (t === tab) ? '' : 'none';
+        });
+
+        if (tab === 'bookings') {
+            setupRealtimeBookingsListener();
+        }
+    };
+
+    // Initialize bookings count badge immediately
+    db.collection('bookings').onSnapshot((snapshot) => {
+        const badge = document.getElementById('booking-badge');
+        if (badge) {
+            badge.textContent = snapshot.size;
+        }
+    }, (err) => {
+        console.warn("Could not fetch bookings count:", err);
+    });
 });
