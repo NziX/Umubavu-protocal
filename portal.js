@@ -281,4 +281,120 @@ document.addEventListener('DOMContentLoaded', () => {
     function escapeHtml(str) {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+
+    // ============================================================
+    // BOOKINGS SECTION
+    // ============================================================
+
+    function getBookings() {
+        try {
+            return JSON.parse(localStorage.getItem('umubavu_bookings') || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function renderBookings() {
+        const list = document.getElementById('bookings-list');
+        if (!list) return;
+        const bookings = getBookings();
+        const badge = document.getElementById('booking-badge');
+        if (badge) badge.textContent = bookings.length;
+
+        if (bookings.length === 0) {
+            list.innerHTML = `
+                <div style="text-align:center; padding:3rem; color:var(--text-muted);">
+                    <i class="fas fa-inbox" style="font-size:2.5rem; color:var(--primary-gold); margin-bottom:1rem; display:block;"></i>
+                    <p>No bookings yet. Booking requests from the website will appear here.</p>
+                </div>
+            `;
+            return;
+        }
+
+        list.innerHTML = bookings.slice().reverse().map((b, i) => `
+            <div class="booking-row" id="booking-${b.id}">
+                <div>
+                    <div class="booking-label"><i class="fas fa-user"></i> Client Name</div>
+                    <div class="booking-value">${escapeHtml(b.name || '—')}</div>
+                    <div style="margin-top:0.4rem;">
+                        <div class="booking-label"><i class="fas fa-phone"></i> Phone / WhatsApp</div>
+                        <div class="booking-value">
+                            <a href="https://wa.me/${(b.phone||'').replace(/\s+/g,'')}" target="_blank"
+                               style="color:var(--primary-gold);text-decoration:none;">
+                                ${escapeHtml(b.phone || '—')}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="booking-label"><i class="fas fa-calendar-alt"></i> Event Date</div>
+                    <div class="booking-value">${escapeHtml(b.eventDate || '—')}</div>
+                    <div style="margin-top:0.4rem;">
+                        <div class="booking-label"><i class="fas fa-map-marker-alt"></i> Venue</div>
+                        <div class="booking-value">${escapeHtml(b.venue || '—')}</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="booking-label"><i class="fas fa-concierge-bell"></i> Service</div>
+                    <div class="booking-value">${escapeHtml(b.service || '—')}</div>
+                    <div style="margin-top:0.4rem;">
+                        <div class="booking-label"><i class="fas fa-clock"></i> Submitted</div>
+                        <div class="booking-value" style="font-size:0.85rem; color:var(--text-secondary);">${b.submittedAt || '—'}</div>
+                    </div>
+                </div>
+                <div class="booking-actions">
+                    <span class="status-badge ${b.contacted ? 'status-done' : 'status-new'}" 
+                          onclick="toggleContacted('${b.id}')" 
+                          style="cursor:pointer; user-select:none;" 
+                          title="Click to toggle status">
+                        ${b.contacted ? '✓ Contacted' : '⏳ New'}
+                    </span>
+                    <button onclick="deleteBooking('${b.id}')" class="btn btn-danger" style="font-size:0.78rem; padding:0.35rem 0.8rem;">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    window.toggleContacted = function(id) {
+        const bookings = getBookings();
+        const idx = bookings.findIndex(b => b.id === id);
+        if (idx !== -1) {
+            bookings[idx].contacted = !bookings[idx].contacted;
+            localStorage.setItem('umubavu_bookings', JSON.stringify(bookings));
+            renderBookings();
+        }
+    };
+
+    window.deleteBooking = function(id) {
+        if (confirm('Remove this booking from the portal?')) {
+            const bookings = getBookings().filter(b => b.id !== id);
+            localStorage.setItem('umubavu_bookings', JSON.stringify(bookings));
+            renderBookings();
+        }
+    };
+
+    window.clearAllBookings = function() {
+        if (confirm('Delete ALL booking records? This cannot be undone.')) {
+            localStorage.removeItem('umubavu_bookings');
+            renderBookings();
+        }
+    };
+
+    // Tab switcher
+    window.switchTab = function(tab) {
+        const tabs = ['media', 'bookings'];
+        tabs.forEach(t => {
+            document.getElementById('tab-' + t)?.classList.toggle('active', t === tab);
+            const panel = document.getElementById('panel-' + t);
+            if (panel) panel.style.display = (t === tab) ? '' : 'none';
+        });
+        if (tab === 'bookings') renderBookings();
+    };
+
+    // Initial badge count
+    const badge = document.getElementById('booking-badge');
+    if (badge) badge.textContent = getBookings().length;
+
 });

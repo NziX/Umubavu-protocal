@@ -134,6 +134,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const eventLocation = document.getElementById('event-location').value.trim();
             const recommendedStaff = recStaffElement.textContent;
 
+            // ── Save booking to localStorage for Technician Portal ──
+            const booking = {
+                id: 'bk_' + Date.now(),
+                name: clientName,
+                phone: clientPhone,
+                service: eventType,
+                guests: guestCount,
+                eventDate: eventDate || 'To be specified',
+                venue: eventLocation,
+                staffSuggested: recommendedStaff,
+                contacted: false,
+                submittedAt: new Date().toLocaleString('en-GB')
+            };
+            try {
+                const existing = JSON.parse(localStorage.getItem('umubavu_bookings') || '[]');
+                existing.push(booking);
+                localStorage.setItem('umubavu_bookings', JSON.stringify(existing));
+            } catch (err) {
+                console.warn('Could not save booking locally:', err);
+            }
+
             const message = `Hello *Umubavu Protocol*! 🌟\nI would like to request an event protocol & ushering quote.\n\n` +
                 `👤 *Client Name:* ${clientName}\n` +
                 `📞 *Phone:* ${clientPhone}\n` +
