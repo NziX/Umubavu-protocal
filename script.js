@@ -176,13 +176,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 7. Load Technician Uploaded Media into Gallery
+    // 7. Dynamic Gallery Loader (Supports Deletion & Uploads via Technician Portal)
     const galleryGrid = document.getElementById('gallery-grid');
     if (galleryGrid) {
-        const uploads = JSON.parse(localStorage.getItem('umubavu_gallery_uploads') || '[]');
-        if (uploads.length > 0) {
-            const uploadedHtml = uploads.map(item => `
-                <div class="gallery-item" style="border-color: var(--border-gold);">
+        const DEFAULT_ITEMS = [
+            { id: 'def_1', title: 'Royal Wedding Protocol', venue: 'Kigali, Rwanda', type: 'image', url: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80' },
+            { id: 'def_2', title: 'Annual Executive Gala', venue: 'VIP Red Carpet Escort', type: 'image', url: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=800&q=80' },
+            { id: 'def_3', title: 'International Summit', venue: 'Delegate Registration & Ushering', type: 'image', url: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=800&q=80' },
+            { id: 'def_4', title: 'Precision Table Seating', venue: 'Banquet Guest Management', type: 'image', url: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=800&q=80' },
+            { id: 'def_5', title: 'Crowd Control & Entry Protocol', venue: 'Concert Gate Coordination', type: 'image', url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80' },
+            { id: 'def_6', title: 'Team Briefing & Readiness', venue: 'Unmatched Professionalism', type: 'image', url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80' }
+        ];
+
+        const stored = localStorage.getItem('umubavu_full_gallery');
+        const items = stored ? JSON.parse(stored) : DEFAULT_ITEMS;
+
+        if (items.length === 0) {
+            galleryGrid.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-secondary);">
+                    <i class="fas fa-camera-retro" style="font-size: 2.5rem; color: var(--primary-gold); margin-bottom: 1rem;"></i>
+                    <p>New event photos coming soon!</p>
+                </div>
+            `;
+        } else {
+            galleryGrid.innerHTML = items.map(item => `
+                <div class="gallery-item">
                     ${item.type === 'video'
                         ? `<video src="${item.url}" controls style="width:100%;height:100%;object-fit:cover;"></video>`
                         : `<img src="${item.url}" alt="${escapeHtml(item.title)}">`
@@ -193,9 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             `).join('');
-            
-            // Prepend technician uploads to existing default gallery
-            galleryGrid.insertAdjacentHTML('afterbegin', uploadedHtml);
         }
     }
 

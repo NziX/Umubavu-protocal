@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Umubavu Protocol - Technician Portal Logic
+   Umubavu Protocol - Technician Portal Logic (Full Media Management)
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,6 +9,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const pinInput = document.getElementById('pin-input');
     const loginError = document.getElementById('login-error');
     const logoutBtn = document.getElementById('logout-btn');
+
+    const DEFAULT_ITEMS = [
+        { id: 'def_1', title: 'Royal Wedding Protocol', venue: 'Kigali, Rwanda', type: 'image', url: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80', isDefault: true, date: 'Default' },
+        { id: 'def_2', title: 'Annual Executive Gala', venue: 'VIP Red Carpet Escort', type: 'image', url: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=800&q=80', isDefault: true, date: 'Default' },
+        { id: 'def_3', title: 'International Summit', venue: 'Delegate Registration & Ushering', type: 'image', url: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=800&q=80', isDefault: true, date: 'Default' },
+        { id: 'def_4', title: 'Precision Table Seating', venue: 'Banquet Guest Management', type: 'image', url: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=800&q=80', isDefault: true, date: 'Default' },
+        { id: 'def_5', title: 'Crowd Control & Entry Protocol', venue: 'Concert Gate Coordination', type: 'image', url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80', isDefault: true, date: 'Default' },
+        { id: 'def_6', title: 'Team Briefing & Readiness', venue: 'Unmatched Professionalism', type: 'image', url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80', isDefault: true, date: 'Default' }
+    ];
+
+    function getGalleryItems() {
+        const stored = localStorage.getItem('umubavu_full_gallery');
+        if (stored) {
+            return JSON.parse(stored);
+        }
+        // Initialize with default items if first time
+        localStorage.setItem('umubavu_full_gallery', JSON.stringify(DEFAULT_ITEMS));
+        return DEFAULT_ITEMS;
+    }
 
     // 1. PIN Authentication
     function checkAuth() {
@@ -131,10 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
             date: new Date().toLocaleDateString('en-GB')
         };
 
-        // Get existing uploads
-        const uploads = JSON.parse(localStorage.getItem('umubavu_gallery_uploads') || '[]');
-        uploads.unshift(newItem);
-        localStorage.setItem('umubavu_gallery_uploads', JSON.stringify(uploads));
+        let items = getGalleryItems();
+        items.unshift(newItem);
+        localStorage.setItem('umubavu_full_gallery', JSON.stringify(items));
 
         alert('Event media successfully published to live website gallery!');
 
@@ -144,30 +162,30 @@ document.addEventListener('DOMContentLoaded', () => {
         renderMediaList();
     });
 
-    // 4. Render Media Manager List
+    // 4. Render Media Manager List (Default + Uploaded Items)
     function renderMediaList() {
         const mediaList = document.getElementById('media-list');
-        const uploads = JSON.parse(localStorage.getItem('umubavu_gallery_uploads') || '[]');
+        const items = getGalleryItems();
 
-        if (uploads.length === 0) {
+        if (items.length === 0) {
             mediaList.innerHTML = `
                 <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
                     <i class="fas fa-images" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
-                    <p>No technician uploads published yet.</p>
+                    <p>Gallery is completely empty. Upload photos or videos to populate.</p>
                 </div>
             `;
             return;
         }
 
-        mediaList.innerHTML = uploads.map(item => `
+        mediaList.innerHTML = items.map(item => `
             <div class="media-item" id="item-${item.id}">
                 ${item.type === 'video' 
                     ? `<div class="media-item-thumb" style="display:flex;align-items:center;justify-content:center;background:#1a233a;color:var(--primary-gold);"><i class="fas fa-video"></i></div>`
                     : `<img src="${item.url}" class="media-item-thumb">`
                 }
                 <div class="media-item-info">
-                    <h4>${escapeHtml(item.title)}</h4>
-                    <p><i class="fas fa-map-marker-alt" style="color:var(--primary-gold);"></i> ${escapeHtml(item.venue)} • ${item.date}</p>
+                    <h4>${escapeHtml(item.title)} ${item.isDefault ? '<span style="font-size:0.7rem;background:rgba(212,175,55,0.2);color:var(--primary-gold);padding:2px 6px;border-radius:4px;">Default Sample</span>' : ''}</h4>
+                    <p><i class="fas fa-map-marker-alt" style="color:var(--primary-gold);"></i> ${escapeHtml(item.venue)}</p>
                 </div>
                 <button onclick="deleteMediaItem('${item.id}')" class="btn btn-danger">
                     <i class="fas fa-trash"></i> Delete
@@ -177,10 +195,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.deleteMediaItem = function(id) {
-        if (confirm('Are you sure you want to remove this media from the public website?')) {
-            let uploads = JSON.parse(localStorage.getItem('umubavu_gallery_uploads') || '[]');
-            uploads = uploads.filter(item => item.id !== id);
-            localStorage.setItem('umubavu_gallery_uploads', JSON.stringify(uploads));
+        if (confirm('Are you sure you want to delete this media item from the website gallery?')) {
+            let items = getGalleryItems();
+            items = items.filter(item => item.id !== id);
+            localStorage.setItem('umubavu_full_gallery', JSON.stringify(items));
             renderMediaList();
         }
     };
