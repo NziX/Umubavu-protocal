@@ -134,6 +134,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const eventLocation = document.getElementById('event-location').value.trim();
             const recommendedStaff = recStaffElement.textContent;
 
+            // ── Save booking to Firebase Firestore ──
+            db.collection('bookings').add({
+                name: clientName,
+                phone: clientPhone,
+                service: eventType,
+                guests: guestCount,
+                eventDate: eventDate || 'To be specified',
+                venue: eventLocation,
+                staffSuggested: recommendedStaff,
+                contacted: false,
+                submittedAt: new Date().toLocaleString('en-GB'),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(err => console.error("Error saving booking to Firestore: ", err));
+
             const message = `Hello *Umubavu Protocol*! 🌟\nI would like to request an event protocol & ushering quote.\n\n` +
                 `👤 *Client Name:* ${clientName}\n` +
                 `📞 *Phone:* ${clientPhone}\n` +
@@ -163,6 +177,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const phone = document.getElementById('contact-phone-direct').value.trim();
             const messageText = document.getElementById('contact-message').value.trim();
 
+            // ── Save contact inquiry to Firebase Firestore ──
+            db.collection('contact_inquiries').add({
+                name: name,
+                email: email,
+                phone: phone,
+                message: messageText,
+                contacted: false,
+                submittedAt: new Date().toLocaleString('en-GB'),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(err => console.error("Error saving inquiry to Firestore: ", err));
+
             const formattedMessage = `Hello *Umubavu Protocol*,\n` +
                 `Inquiry from Website Form:\n` +
                 `👤 Name: ${name}\n` +
@@ -176,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 7. Dynamic Gallery Loader (Supports Video & Image files via IndexedDB)
+    // 7. Dynamic Gallery Loader (Supports Video & Image files via Firebase Firestore)
     const galleryGrid = document.getElementById('gallery-grid');
     if (galleryGrid) {
         const DEFAULT_ITEMS = [
@@ -188,76 +213,53 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 'def_6', title: 'Team Briefing & Readiness', venue: 'Unmatched Professionalism', type: 'image', url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80' }
         ];
 
-        const DB_NAME = 'UmubavuGalleryDB';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'gallery_items';
-
-        function openDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                    }
-                };
-                request.onsuccess = (e) => resolve(e.target.result);
-                request.onerror = (e) => reject(e.target.error);
+        // Real-time Firestore sync
+        db.collection('gallery_items').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+            let items = [];
+            snapshot.forEach(doc => {
+                items.push({ id: doc.id, ...doc.data() });
             });
-        }
 
-        async function loadPublicGallery() {
-            try {
-                const db = await openDB();
-                const tx = db.transaction(STORE_NAME, 'readonly');
-                const store = tx.objectStore(STORE_NAME);
-                const request = store.getAll();
-
-                request.onsuccess = () => {
-                    let items = request.result;
-                    if (!items || items.length === 0) {
-                        const initialized = localStorage.getItem('umubavu_db_init');
-                        if (!initialized) {
-                            items = DEFAULT_ITEMS;
-                        }
-                    }
-
-                    if (!items || items.length === 0) {
-                        galleryGrid.innerHTML = `
-                            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-secondary);">
-                                <i class="fas fa-camera-retro" style="font-size: 2.5rem; color: var(--primary-gold); margin-bottom: 1rem;"></i>
-                                <p>New event photos and videos coming soon!</p>
-                            </div>
-                        `;
-                    } else {
-                        galleryGrid.innerHTML = items.map((item, index) => `
-                            <div class="gallery-item" data-index="${index}" style="cursor:pointer;">
-                                ${item.type === 'video'
-                                    ? `<video src="${item.url}" preload="metadata" muted playsinline></video>
-                                       <div class="video-play-btn"><i class="fas fa-play" style="margin-left:3px;"></i></div>`
-                                    : `<img src="${item.url}" alt="${escapeHtml(item.title)}">`
-                                }
-                                <div class="gallery-overlay">
-                                    <h4>${escapeHtml(item.title)}</h4>
-                                    <p><i class="fas fa-map-marker-alt" style="color:var(--primary-gold);"></i> ${escapeHtml(item.venue)}</p>
-                                </div>
-                            </div>
-                        `).join('');
-
-                        // Attach click listeners to open Lightbox
-                        document.querySelectorAll('.gallery-item').forEach((card, idx) => {
-                            card.addEventListener('click', () => {
-                                openLightbox(items[idx]);
-                            });
-                        });
-                    }
-                };
-            } catch (err) {
-                console.error('Gallery Load Error:', err);
+            // If empty (e.g. fresh database), load defaults to Firestore
+            if (items.length === 0) {
+                DEFAULT_ITEMS.forEach(async (item) => {
+                    await db.collection('gallery_items').doc(item.id).set({
+                        title: item.title,
+                        venue: item.venue,
+                        type: item.type,
+                        url: item.url,
+                        isDefault: true,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+                return;
             }
-        }
 
-        loadPublicGallery();
+            // Render gallery
+            galleryGrid.innerHTML = items.map((item, index) => `
+                <div class="gallery-item" data-index="${index}" style="cursor:pointer;">
+                    ${item.type === 'video'
+                        ? `<video src="${item.url}" preload="metadata" muted playsinline></video>
+                           <div class="video-play-btn"><i class="fas fa-play" style="margin-left:3px;"></i></div>`
+                        : `<img src="${item.url}" alt="${escapeHtml(item.title)}">`
+                    }
+                    <div class="gallery-overlay">
+                        <h4>${escapeHtml(item.title)}</h4>
+                        <p><i class="fas fa-map-marker-alt" style="color:var(--primary-gold);"></i> ${escapeHtml(item.venue)}</p>
+                    </div>
+                </div>
+            `).join('');
+
+            // Attach click listeners to open Lightbox
+            document.querySelectorAll('.gallery-item').forEach((card) => {
+                card.addEventListener('click', () => {
+                    const idx = parseInt(card.getAttribute('data-index'));
+                    openLightbox(items[idx]);
+                });
+            });
+        }, (err) => {
+            console.error('Firestore Gallery Listen Error:', err);
+        });
     }
 
     // 8. Fullscreen Lightbox Modal Controls
