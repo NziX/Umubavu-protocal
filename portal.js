@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewContainer = document.getElementById('preview-container');
     const clearPreviewBtn = document.getElementById('clear-preview');
     const submitBtn = document.getElementById('submit-upload-btn');
-    let currentFileDataUrl = null;
+    let currentFileObjectUrl = null;
     let currentFileType = null;
     let selectedFile = null; // Holds the actual file object for Firebase upload
 
@@ -91,26 +91,23 @@ document.addEventListener('DOMContentLoaded', () => {
         previewBox.style.display = 'block';
         dropZone.style.display = 'none';
 
-        const reader = new FileReader();
+        // Generate instant local blob URL for preview (takes 0ms, uses no memory)
+        if (currentFileObjectUrl) {
+            URL.revokeObjectURL(currentFileObjectUrl);
+        }
+        currentFileObjectUrl = URL.createObjectURL(file);
 
-        reader.onload = (event) => {
-            currentFileDataUrl = event.target.result;
-            previewContainer.innerHTML = currentFileType === 'video' 
-                ? `<video src="${currentFileDataUrl}" controls style="max-height: 250px; width: 100%; border-radius: 8px;"></video>`
-                : `<img src="${currentFileDataUrl}" style="max-height: 250px; width: 100%; object-fit: cover; border-radius: 8px;">`;
-        };
-
-        reader.onerror = () => {
-            alert('Error reading file. Please choose a smaller file.');
-            clearPreviewBtn.click();
-        };
-
-        reader.readAsDataURL(file);
+        previewContainer.innerHTML = currentFileType === 'video' 
+            ? `<video src="${currentFileObjectUrl}" controls style="max-height: 250px; width: 100%; border-radius: 8px;"></video>`
+            : `<img src="${currentFileObjectUrl}" style="max-height: 250px; width: 100%; object-fit: cover; border-radius: 8px;">`;
     }
 
     clearPreviewBtn.addEventListener('click', () => {
+        if (currentFileObjectUrl) {
+            URL.revokeObjectURL(currentFileObjectUrl);
+            currentFileObjectUrl = null;
+        }
         selectedFile = null;
-        currentFileDataUrl = null;
         currentFileType = null;
         fileInput.value = '';
         previewContainer.innerHTML = '';
