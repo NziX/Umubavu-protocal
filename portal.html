@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technician Media Portal | Umubavu Protocol</title>
+    <meta name="robots" content="noindex, nofollow">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Additional Portal-Specific Styling */
+        .portal-body {
+            background-color: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .portal-header {
+            background: rgba(20, 28, 46, 0.9);
+            border-bottom: 1px solid var(--border-gold);
+            padding: 1rem 0;
+        }
+
+        .portal-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .login-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(11, 15, 25, 0.95);
+            backdrop-filter: blur(15px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-gold);
+            border-radius: var(--radius-lg);
+            padding: 3rem 2.5rem;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+            box-shadow: var(--shadow-card);
+        }
+
+        .login-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(212, 175, 55, 0.12);
+            color: var(--primary-gold);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 1.5rem;
+        }
+
+        .login-card h2 {
+            font-family: var(--font-heading);
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-card p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+
+        .pin-input-group {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .pin-input-group input {
+            text-align: center;
+            font-size: 1.5rem;
+            letter-spacing: 0.5rem;
+            font-weight: 700;
+        }
+
+        .error-msg {
+            color: #ef4444;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        .portal-main {
+            flex: 1;
+            padding: 3rem 0;
+        }
+
+        .portal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2.5rem;
+        }
+
+        .upload-card, .manager-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: var(--radius-lg);
+            padding: 2.5rem;
+        }
+
+        .upload-card {
+            border-color: var(--border-gold);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-dark);
+        }
+
+        .card-header i {
+            color: var(--primary-gold);
+            font-size: 1.4rem;
+        }
+
+        .card-header h3 {
+            font-family: var(--font-heading);
+            font-size: 1.4rem;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border-gold);
+            border-radius: var(--radius-md);
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            background: rgba(11, 15, 25, 0.5);
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 1.5rem;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            background: rgba(212, 175, 55, 0.08);
+            border-color: var(--primary-gold-light);
+        }
+
+        .drop-zone i {
+            font-size: 2.5rem;
+            color: var(--primary-gold);
+            margin-bottom: 1rem;
+        }
+
+        .preview-box {
+            margin-top: 1rem;
+            display: none;
+            position: relative;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            max-height: 250px;
+        }
+
+        .preview-box img, .preview-box video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: var(--radius-md);
+        }
+
+        .clear-preview {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .media-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .media-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: rgba(11, 15, 25, 0.6);
+            border: 1px solid var(--border-dark);
+            border-radius: var(--radius-md);
+        }
+
+        .media-item-thumb {
+            width: 60px;
+            height: 60px;
+            border-radius: var(--radius-sm);
+            object-fit: cover;
+            background: #000;
+        }
+
+        .media-item-info {
+            flex: 1;
+        }
+
+        .media-item-info h4 {
+            font-size: 0.95rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .media-item-info p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            border-radius: var(--radius-sm);
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        @media (max-width: 992px) {
+            .portal-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="portal-body">
+
+    <!-- PIN Authentication Overlay -->
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-card">
+            <div class="login-icon">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <h2>Technician Login</h2>
+            <p>Enter security PIN to access event media upload portal.</p>
+            
+            <form id="login-form">
+                <div class="pin-input-group">
+                    <input type="password" id="pin-input" placeholder="••••" maxlength="12" required autofocus>
+                </div>
+                <div class="error-msg" id="login-error">Incorrect PIN. Please try again.</div>
+                <button type="submit" class="btn btn-gold btn-block" style="margin-top: 1rem;">
+                    <i class="fas fa-lock-open"></i> Unlock Portal
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Portal Header Navigation -->
+    <header class="portal-header">
+        <div class="container portal-nav">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">UP</div>
+                <div class="logo-text">
+                    <span class="brand-title">UMUBAVU</span>
+                    <span class="brand-sub">PORTAL</span>
+                </div>
+            </a>
+
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <a href="index.html" class="btn btn-outline" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> View Public Website
+                </a>
+                <button id="logout-btn" class="btn btn-outline" style="border-color: #ef4444; color: #ef4444;">
+                    <i class="fas fa-sign-out-alt"></i> Lock
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="portal-main">
+        <div class="container">
+            <div class="portal-grid">
+                
+                <!-- Upload Form Column -->
+                <div class="upload-card">
+                    <div class="card-header">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <div>
+                            <h3>Upload Event Media</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">Add photos and videos of attended events directly to the website gallery.</p>
+                        </div>
+                    </div>
+
+                    <form id="upload-form">
+                        <div class="form-group" style="margin-bottom: 1.2rem;">
+                            <label for="media-title"><i class="fas fa-heading"></i> Event Title</label>
+                            <input type="text" id="media-title" placeholder="e.g. Royal Wedding Protocol - Kigali" required>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.2rem;">
+                            <label for="media-category"><i class="fas fa-folder"></i> Event Category</label>
+                            <select id="media-category" required>
+                                <option value="weddings">💍 Weddings & Receptions</option>
+                                <option value="galas">🎩 Galas & Corporate Dinners</option>
+                                <option value="crowd">👥 Crowd Control & Entry Protocol</option>
+                                <option value="vip">🌟 VIP Protocol & Ushering</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.2rem;">
+                            <label for="media-venue"><i class="fas fa-map-marker-alt"></i> Venue & Location</label>
+                            <input type="text" id="media-venue" placeholder="e.g. Kigali Convention Centre" required>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.2rem;">
+                            <label><i class="fas fa-photo-video"></i> Select Image or Video File</label>
+                            <div class="drop-zone" id="drop-zone">
+                                <i class="fas fa-file-upload"></i>
+                                <p><strong>Click to browse</strong> or drag & drop file here</p>
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">Supports JPG, PNG, WEBP, and MP4 files</span>
+                                <input type="file" id="file-input" accept="image/*,video/*" style="display: none;" required>
+                            </div>
+
+                            <div class="preview-box" id="preview-box">
+                                <button type="button" class="clear-preview" id="clear-preview"><i class="fas fa-times"></i></button>
+                                <div id="preview-container"></div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-gold btn-block btn-lg" id="submit-upload-btn">
+                            <i class="fas fa-paper-plane"></i> Publish to Live Gallery
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Upload Manager Column -->
+                <div class="manager-card">
+                    <div class="card-header">
+                        <i class="fas fa-photo-video"></i>
+                        <div>
+                            <h3>Published Event Media</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">Manage active uploads visible on the public website.</p>
+                        </div>
+                    </div>
+
+                    <div class="media-list" id="media-list">
+                        <!-- Dynamic Uploads Will Render Here -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: #07090F; padding: 1.5rem 0; text-align: center; border-top: 1px solid var(--border-dark);">
+        <p style="font-size: 0.85rem; color: var(--text-muted);">&copy; Umubavu Protocol - Internal Technician Media Portal</p>
+    </footer>
+
+    <!-- Portal JavaScript -->
+    <script src="portal.js"></script>
+</body>
+</html>
