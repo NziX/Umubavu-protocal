@@ -450,6 +450,11 @@
                         <span>Private Party Host</span>
                     </div>
                 </div>
+
+            <div class="text-center" style="margin-top: 2.5rem;">
+                <button id="open-testimonial-btn" class="btn btn-secondary">
+                    <i class="fas fa-edit"></i> Share Your Experience
+                </button>
             </div>
         </div>
     </section>
@@ -582,12 +587,43 @@
         </div>
     </div>
 
+    <!-- Testimonial Submission Modal -->
+    <div class="testimonial-modal" id="testimonial-modal">
+        <div class="testimonial-modal-content">
+            <button class="testimonial-modal-close" id="testimonial-modal-close">&times;</button>
+            <h3>Share Your Experience</h3>
+            <p style="font-size:0.85rem; color:var(--text-secondary); text-align:center; margin-bottom:1.5rem;">Your review will be shared after technician approval.</p>
+            
+            <form id="testimonial-form">
+                <label>Rating</label>
+                <div class="rating-input" id="rating-stars">
+                    <i class="fas fa-star" data-rating="1"></i>
+                    <i class="fas fa-star" data-rating="2"></i>
+                    <i class="fas fa-star" data-rating="3"></i>
+                    <i class="fas fa-star" data-rating="4"></i>
+                    <i class="fas fa-star" data-rating="5"></i>
+                </div>
+                
+                <label for="testimonial-name">Your Name</label>
+                <input type="text" id="testimonial-name" placeholder="e.g. Keza & Eric M." required>
+                
+                <label for="testimonial-role">Your Role / Event</label>
+                <input type="text" id="testimonial-role" placeholder="e.g. Wedding Couple, Kigali" required>
+                
+                <label for="testimonial-text">Review / Feedback</label>
+                <textarea id="testimonial-text" rows="4" placeholder="How was our ushering and protocol service?" maxlength="300" required></textarea>
+                
+                <button type="submit" class="btn btn-primary" style="width:100%;">Submit Review</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Firebase SDK (Compat Version for CDN usage) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
 
     <!-- JavaScript -->
-    <script src="script.js?v=9"></script>
+    <script src="script.js?v=10"></script>
 </body>
 </html>

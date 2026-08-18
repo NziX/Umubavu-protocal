@@ -516,7 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Tab Switcher Logic ---
     window.switchTab = function(tab) {
-        const tabs = ['media', 'bookings'];
+        const tabs = ['media', 'bookings', 'testimonials'];
         tabs.forEach(t => {
             const btn = document.getElementById('tab-' + t);
             if (btn) btn.classList.toggle('active', t === tab);
@@ -527,6 +527,101 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tab === 'bookings') {
             setupRealtimeBookingsListener();
+        } else if (tab === 'testimonials') {
+            setupRealtimeTestimonialsListener();
+        }
+    };
+
+    // ============================================================
+    // PORTAL TESTIMONIALS MANAGER (Firestore Sync)
+    // ============================================================
+    let testimonialsListenerUnsubscribe = null;
+
+    function setupRealtimeTestimonialsListener() {
+        if (testimonialsListenerUnsubscribe) return;
+
+        const list = document.getElementById('testimonials-list');
+        if (!list) return;
+
+        testimonialsListenerUnsubscribe = db.collection('testimonials')
+            .onSnapshot((snapshot) => {
+                let testimonials = [];
+                snapshot.forEach(doc => {
+                    testimonials.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Sort client-side safely (newest first)
+                testimonials.sort((a, b) => {
+                    const timeA = a.createdAt ? (a.createdAt.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime()) : 0;
+                    const timeB = b.createdAt ? (b.createdAt.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime()) : 0;
+                    return timeB - timeA;
+                });
+
+                if (testimonials.length === 0) {
+                    list.innerHTML = `
+                        <div style="text-align:center; padding:3rem; color:var(--text-muted);">
+                            <i class="fas fa-quote-right" style="font-size:2.5rem; color:var(--primary-gold); margin-bottom:1rem; display:block;"></i>
+                            <p>No testimonials submitted by clients yet.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                list.innerHTML = testimonials.map(t => {
+                    const isApproved = t.status === 'approved';
+                    const ratingStars = Array(t.rating || 5).fill('<i class="fas fa-star" style="color:var(--primary-gold); font-size:0.85rem;"></i>').join('');
+                    
+                    return `
+                        <div class="booking-item" id="testimonial-${t.id}">
+                            <div class="booking-details">
+                                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                                    <h4 style="margin:0;">${escapeHtml(t.clientName || 'Anonymous')}</h4>
+                                    <span style="font-size:0.75rem; background:rgba(212,175,55,0.15); color:var(--primary-gold); padding:2px 6px; border-radius:4px;">${escapeHtml(t.eventRole || 'Client')}</span>
+                                </div>
+                                <div style="margin-bottom:0.5rem;">${ratingStars}</div>
+                                <p style="font-style:italic; color:var(--text-secondary); margin:0 0 0.5rem 0; font-size:0.9rem;">"${escapeHtml(t.text)}"</p>
+                                <div style="font-size:0.75rem; color:var(--text-muted);">
+                                    Submitted: ${t.createdAt ? (t.createdAt.toDate ? t.createdAt.toDate().toLocaleString() : new Date(t.createdAt).toLocaleString()) : 'Just now'}
+                                </div>
+                            </div>
+                            <div class="booking-actions">
+                                <button onclick="toggleApproveTestimonial('${t.id}', '${t.status}')" class="btn ${isApproved ? 'btn-secondary' : 'btn-success'}" style="font-size:0.78rem; padding:0.35rem 0.8rem; white-space:nowrap;">
+                                    ${isApproved ? '<i class="fas fa-times-circle"></i> Unapprove' : '<i class="fas fa-check-circle"></i> Approve'}
+                                </button>
+                                <button onclick="deleteTestimonial('${t.id}')" class="btn btn-danger" style="font-size:0.78rem; padding:0.35rem 0.8rem; white-space:nowrap;">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }, (err) => {
+                console.error("Testimonials Listen Error:", err);
+            });
+    }
+
+    // Toggle Approval status
+    window.toggleApproveTestimonial = async function(id, currentStatus) {
+        const nextStatus = currentStatus === 'approved' ? 'pending' : 'approved';
+        try {
+            await db.collection('testimonials').doc(id).update({
+                status: nextStatus
+            });
+        } catch (err) {
+            console.error("Error updating testimonial approval:", err);
+            alert("Failed to update status: " + err.message);
+        }
+    };
+
+    // Delete testimonial
+    window.deleteTestimonial = async function(id) {
+        if (confirm('Are you sure you want to delete this testimonial?')) {
+            try {
+                await db.collection('testimonials').doc(id).delete();
+            } catch (err) {
+                console.error("Error deleting testimonial:", err);
+                alert("Failed to delete testimonial: " + err.message);
+            }
         }
     };
 
@@ -538,5 +633,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, (err) => {
         console.warn("Could not fetch bookings count:", err);
+    });
+
+    // Initialize testimonials count badge for pending status
+    db.collection('testimonials').where('status', '==', 'pending').onSnapshot((snapshot) => {
+        const badge = document.getElementById('testimonial-badge');
+        if (badge) {
+            if (snapshot.size > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = snapshot.size;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    }, (err) => {
+        console.warn("Could not fetch testimonials count:", err);
     });
 });

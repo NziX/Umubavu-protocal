@@ -1283,3 +1283,109 @@ img {
     font-size: 0.95rem;
 }
 
+/* ==========================================================================
+   Testimonials Submission Form Modal Styles
+   ========================================================================== */
+.testimonial-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(7, 9, 15, 0.95);
+    backdrop-filter: blur(10px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.testimonial-modal.active {
+    display: flex;
+    opacity: 1;
+}
+
+.testimonial-modal-content {
+    background: #0f1424;
+    border: 1px solid var(--border-gold);
+    border-radius: var(--radius-lg);
+    padding: 2.5rem 2rem;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    position: relative;
+    color: var(--text-primary);
+}
+
+.testimonial-modal-close {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 2rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: var(--transition);
+}
+
+.testimonial-modal-close:hover {
+    color: var(--primary-gold);
+}
+
+.testimonial-modal-content h3 {
+    font-family: var(--font-heading);
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    color: var(--primary-gold);
+    text-align: center;
+}
+
+.rating-input {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 1rem 0 1.5rem 0;
+    font-size: 1.8rem;
+}
+
+.rating-input i {
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: var(--transition);
+}
+
+.rating-input i.active {
+    color: var(--primary-gold);
+}
+
+.testimonial-modal-content label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.testimonial-modal-content input,
+.testimonial-modal-content textarea {
+    width: 100%;
+    background: rgba(7, 9, 15, 0.6);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    color: var(--text-primary);
+    font-family: inherit;
+    margin-bottom: 1.25rem;
+    transition: var(--transition);
+}
+
+.testimonial-modal-content input:focus,
+.testimonial-modal-content textarea:focus {
+    border-color: var(--primary-gold);
+    outline: none;
+    background: rgba(7, 9, 15, 0.9);
+}
+
+

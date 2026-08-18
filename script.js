@@ -382,6 +382,187 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Real-time Approved Testimonials Loader ---
+    const testimonialsGrid = document.querySelector('.testimonials-grid');
+    if (testimonialsGrid) {
+        db.collection('testimonials')
+            .where('status', '==', 'approved')
+            .onSnapshot((snapshot) => {
+                let testimonials = [];
+                snapshot.forEach(doc => {
+                    testimonials.push({ id: doc.id, ...doc.data() });
+                });
+
+                if (testimonials.length === 0) {
+                    // Fallback to static defaults
+                    testimonialsGrid.innerHTML = `
+                        <div class="testimonial-card">
+                            <div class="stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                            </div>
+                            <p class="testimonial-text">
+                                "Umubavu Protocol handled our wedding reception with absolute elegance. Their team was punctual, well-dressed, and handled our 400+ guests without a single hitch!"
+                            </p>
+                            <div class="client-info">
+                                <strong>Keza & Eric M.</strong>
+                                <span>Wedding Couple, Kigali</span>
+                            </div>
+                        </div>
+
+                        <div class="testimonial-card featured-testimonial">
+                            <div class="stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                            </div>
+                            <p class="testimonial-text">
+                                "For our corporate gala, VIP management was critical. Umubavu Protocol executed red carpet protocol flawlessly. Highly recommended for any high-stakes event."
+                            </p>
+                            <div class="client-info">
+                                <strong>Jean-Pierre K.</strong>
+                                <span>Event Director</span>
+                            </div>
+                        </div>
+
+                        <div class="testimonial-card">
+                            <div class="stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                            </div>
+                            <p class="testimonial-text">
+                                "Great crowd management and guest ushering! They kept our entrance lines moving smoothly and ensured our guests felt welcomed immediately."
+                            </p>
+                            <div class="client-info">
+                                <strong>Divine U.</strong>
+                                <span>Private Party Host</span>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Render dynamically
+                testimonialsGrid.innerHTML = testimonials.map((t, index) => {
+                    const isFeatured = index === 1 ? 'featured-testimonial' : '';
+                    let starsHtml = '';
+                    const r = t.rating || 5;
+                    for (let i = 1; i <= 5; i++) {
+                        starsHtml += `<i class="${i <= r ? 'fas' : 'far'} fa-star"></i>`;
+                    }
+
+                    return `
+                        <div class="testimonial-card ${isFeatured}">
+                            <div class="stars">
+                                ${starsHtml}
+                            </div>
+                            <p class="testimonial-text">
+                                "${escapeHtml(t.text)}"
+                            </p>
+                            <div class="client-info">
+                                <strong>${escapeHtml(t.clientName)}</strong>
+                                <span>${escapeHtml(t.eventRole)}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }, (err) => {
+                console.error("Testimonial Listen Error:", err);
+            });
+    }
+
+    // --- Testimonial Modal Controls ---
+    const testimonialModal = document.getElementById('testimonial-modal');
+    const openTestimonialBtn = document.getElementById('open-testimonial-btn');
+    const closeTestimonialBtn = document.getElementById('testimonial-modal-close');
+    const testimonialForm = document.getElementById('testimonial-form');
+    const ratingStars = document.querySelectorAll('#rating-stars i');
+    let selectedRating = 5; // Default
+
+    // Star Selection
+    ratingStars.forEach(star => {
+        // Init active state for first 5 stars
+        star.classList.add('active');
+        
+        star.addEventListener('click', () => {
+            selectedRating = parseInt(star.getAttribute('data-rating'));
+            ratingStars.forEach((s, idx) => {
+                if (idx < selectedRating) {
+                    s.classList.add('active');
+                } else {
+                    s.classList.remove('active');
+                }
+            });
+        });
+    });
+
+    if (openTestimonialBtn && testimonialModal) {
+        openTestimonialBtn.addEventListener('click', () => {
+            testimonialModal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        });
+    }
+
+    function closeTestimonial() {
+        if (!testimonialModal) return;
+        testimonialModal.classList.remove('active');
+        document.body.style.overflow = '';
+        if (testimonialForm) {
+            testimonialForm.reset();
+            // Reset stars to 5
+            selectedRating = 5;
+            ratingStars.forEach(s => s.classList.add('active'));
+        }
+    }
+
+    if (closeTestimonialBtn) {
+        closeTestimonialBtn.addEventListener('click', closeTestimonial);
+    }
+
+    if (testimonialModal) {
+        testimonialModal.addEventListener('click', (e) => {
+            if (e.target === testimonialModal) {
+                closeTestimonial();
+            }
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && testimonialModal && testimonialModal.classList.contains('active')) {
+            closeTestimonial();
+        }
+    });
+
+    // Submit form to Firestore
+    if (testimonialForm) {
+        testimonialForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('testimonial-name').value.trim();
+            const role = document.getElementById('testimonial-role').value.trim();
+            const text = document.getElementById('testimonial-text').value.trim();
+
+            const submitBtn = testimonialForm.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Submitting...`;
+
+            try {
+                await db.collection('testimonials').add({
+                    clientName: name,
+                    eventRole: role,
+                    rating: selectedRating,
+                    text: text,
+                    status: 'pending', // Requires approval
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                alert('Thank you! Your testimonial has been submitted successfully and is awaiting review by our team.');
+                closeTestimonial();
+            } catch (err) {
+                console.error("Testimonial submit error:", err);
+                alert("Failed to submit review: " + err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `Submit Review`;
+            }
+        });
+    }
+
     function escapeHtml(str) {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
