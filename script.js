@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 7. Dynamic Gallery Loader (Supports Deletion & Uploads via Technician Portal)
+    // 7. Dynamic Gallery Loader (Supports Video & Image files via IndexedDB)
     const galleryGrid = document.getElementById('gallery-grid');
     if (galleryGrid) {
         const DEFAULT_ITEMS = [
@@ -188,30 +188,68 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 'def_6', title: 'Team Briefing & Readiness', venue: 'Unmatched Professionalism', type: 'image', url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80' }
         ];
 
-        const stored = localStorage.getItem('umubavu_full_gallery');
-        const items = stored ? JSON.parse(stored) : DEFAULT_ITEMS;
+        const DB_NAME = 'UmubavuGalleryDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'gallery_items';
 
-        if (items.length === 0) {
-            galleryGrid.innerHTML = `
-                <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-secondary);">
-                    <i class="fas fa-camera-retro" style="font-size: 2.5rem; color: var(--primary-gold); margin-bottom: 1rem;"></i>
-                    <p>New event photos coming soon!</p>
-                </div>
-            `;
-        } else {
-            galleryGrid.innerHTML = items.map(item => `
-                <div class="gallery-item">
-                    ${item.type === 'video'
-                        ? `<video src="${item.url}" controls style="width:100%;height:100%;object-fit:cover;"></video>`
-                        : `<img src="${item.url}" alt="${escapeHtml(item.title)}">`
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
                     }
-                    <div class="gallery-overlay">
-                        <h4>${escapeHtml(item.title)}</h4>
-                        <p><i class="fas fa-map-marker-alt" style="color:var(--primary-gold);"></i> ${escapeHtml(item.venue)}</p>
-                    </div>
-                </div>
-            `).join('');
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e.target.error);
+            });
         }
+
+        async function loadPublicGallery() {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.getAll();
+
+                request.onsuccess = () => {
+                    let items = request.result;
+                    if (!items || items.length === 0) {
+                        const initialized = localStorage.getItem('umubavu_db_init');
+                        if (!initialized) {
+                            items = DEFAULT_ITEMS;
+                        }
+                    }
+
+                    if (!items || items.length === 0) {
+                        galleryGrid.innerHTML = `
+                            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-secondary);">
+                                <i class="fas fa-camera-retro" style="font-size: 2.5rem; color: var(--primary-gold); margin-bottom: 1rem;"></i>
+                                <p>New event photos and videos coming soon!</p>
+                            </div>
+                        `;
+                    } else {
+                        galleryGrid.innerHTML = items.map(item => `
+                            <div class="gallery-item">
+                                ${item.type === 'video'
+                                    ? `<video src="${item.url}" controls preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video>`
+                                    : `<img src="${item.url}" alt="${escapeHtml(item.title)}">`
+                                }
+                                <div class="gallery-overlay">
+                                    <h4>${escapeHtml(item.title)}</h4>
+                                    <p><i class="fas fa-map-marker-alt" style="color:var(--primary-gold);"></i> ${escapeHtml(item.venue)}</p>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                };
+            } catch (err) {
+                console.error('Gallery Load Error:', err);
+            }
+        }
+
+        loadPublicGallery();
     }
 
     function escapeHtml(str) {

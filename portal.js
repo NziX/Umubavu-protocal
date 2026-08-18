@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Umubavu Protocol - Technician Portal Logic (Full Media Management)
+   Umubavu Protocol - Technician Portal Logic (IndexedDB Large File Storage)
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginError = document.getElementById('login-error');
     const logoutBtn = document.getElementById('logout-btn');
 
+    // Default Sample Items
     const DEFAULT_ITEMS = [
         { id: 'def_1', title: 'Royal Wedding Protocol', venue: 'Kigali, Rwanda', type: 'image', url: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80', isDefault: true, date: 'Default' },
         { id: 'def_2', title: 'Annual Executive Gala', venue: 'VIP Red Carpet Escort', type: 'image', url: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=800&q=80', isDefault: true, date: 'Default' },
@@ -19,17 +20,75 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'def_6', title: 'Team Briefing & Readiness', venue: 'Unmatched Professionalism', type: 'image', url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80', isDefault: true, date: 'Default' }
     ];
 
-    function getGalleryItems() {
-        const stored = localStorage.getItem('umubavu_full_gallery');
-        if (stored) {
-            return JSON.parse(stored);
-        }
-        // Initialize with default items if first time
-        localStorage.setItem('umubavu_full_gallery', JSON.stringify(DEFAULT_ITEMS));
-        return DEFAULT_ITEMS;
+    // --- IndexedDB Storage Helper (Supports Gigabyte Video & Image Storage) ---
+    const DB_NAME = 'UmubavuGalleryDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'gallery_items';
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                }
+            };
+            request.onsuccess = (e) => resolve(e.target.result);
+            request.onerror = (e) => reject(e.target.error);
+        });
     }
 
-    // 1. PIN Authentication
+    async function getGalleryItems() {
+        try {
+            const db = await openDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.getAll();
+                request.onsuccess = async () => {
+                    let items = request.result;
+                    const initialized = localStorage.getItem('umubavu_db_init');
+                    if (!initialized || items.length === 0) {
+                        // Populate default items first time
+                        for (const item of DEFAULT_ITEMS) {
+                            await saveGalleryItem(item);
+                        }
+                        localStorage.setItem('umubavu_db_init', 'true');
+                        items = DEFAULT_ITEMS;
+                    }
+                    resolve(items);
+                };
+            });
+        } catch (err) {
+            console.error('IndexedDB Error:', err);
+            return DEFAULT_ITEMS;
+        }
+    }
+
+    async function saveGalleryItem(item) {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const request = store.put(item);
+            request.onsuccess = () => resolve();
+            request.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    async function removeGalleryItem(id) {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    // --- PIN Authentication ---
     function checkAuth() {
         const isAuth = sessionStorage.getItem('umubavu_portal_auth');
         if (isAuth === 'true') {
@@ -62,12 +121,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     checkAuth();
 
-    // 2. Drag & Drop / File Selection
+    // --- Drag & Drop / File Selection ---
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const previewBox = document.getElementById('preview-box');
     const previewContainer = document.getElementById('preview-container');
     const clearPreviewBtn = document.getElementById('clear-preview');
+    const submitBtn = document.getElementById('submit-upload-btn');
     let currentFileDataUrl = null;
     let currentFileType = null;
 
@@ -96,11 +156,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleFileSelect(file) {
         if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-            alert('Please select an image or video file.');
+            alert('Please select a valid image (JPG, PNG) or video (MP4, WEBM) file.');
             return;
         }
 
         currentFileType = file.type.startsWith('video/') ? 'video' : 'image';
+        
+        // Indicate processing
+        previewContainer.innerHTML = `<p style="padding:1rem;color:var(--primary-gold);"><i class="fas fa-spinner fa-spin"></i> Processing file (${(file.size / (1024*1024)).toFixed(1)} MB)...</p>`;
+        previewBox.style.display = 'block';
+        dropZone.style.display = 'none';
+
         const reader = new FileReader();
 
         reader.onload = (event) => {
@@ -108,9 +174,11 @@ document.addEventListener('DOMContentLoaded', () => {
             previewContainer.innerHTML = currentFileType === 'video' 
                 ? `<video src="${currentFileDataUrl}" controls style="max-height: 250px; width: 100%; border-radius: 8px;"></video>`
                 : `<img src="${currentFileDataUrl}" style="max-height: 250px; width: 100%; object-fit: cover; border-radius: 8px;">`;
-            
-            previewBox.style.display = 'block';
-            dropZone.style.display = 'none';
+        };
+
+        reader.onerror = () => {
+            alert('Error reading file. Please try a smaller or supported video format.');
+            clearPreviewBtn.click();
         };
 
         reader.readAsDataURL(file);
@@ -125,49 +193,58 @@ document.addEventListener('DOMContentLoaded', () => {
         dropZone.style.display = 'block';
     });
 
-    // 3. Media Upload Submission
+    // --- Media Upload Submission ---
     const uploadForm = document.getElementById('upload-form');
 
-    uploadForm.addEventListener('submit', (e) => {
+    uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         if (!currentFileDataUrl) {
-            alert('Please select or drag an image or video file to upload.');
+            alert('Please select an image or video file to upload.');
             return;
         }
 
-        const title = document.getElementById('media-title').value.trim();
-        const category = document.getElementById('media-category').value;
-        const venue = document.getElementById('media-venue').value.trim();
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Publishing Media...`;
 
-        const newItem = {
-            id: 'up_' + Date.now(),
-            title: title,
-            category: category,
-            venue: venue,
-            type: currentFileType,
-            url: currentFileDataUrl,
-            date: new Date().toLocaleDateString('en-GB')
-        };
+        try {
+            const title = document.getElementById('media-title').value.trim();
+            const category = document.getElementById('media-category').value;
+            const venue = document.getElementById('media-venue').value.trim();
 
-        let items = getGalleryItems();
-        items.unshift(newItem);
-        localStorage.setItem('umubavu_full_gallery', JSON.stringify(items));
+            const newItem = {
+                id: 'up_' + Date.now(),
+                title: title,
+                category: category,
+                venue: venue,
+                type: currentFileType,
+                url: currentFileDataUrl,
+                date: new Date().toLocaleDateString('en-GB')
+            };
 
-        alert('Event media successfully published to live website gallery!');
+            await saveGalleryItem(newItem);
 
-        // Reset form
-        uploadForm.reset();
-        clearPreviewBtn.click();
-        renderMediaList();
+            alert('Media published successfully! Your photo/video is now live on the website gallery.');
+
+            // Reset form
+            uploadForm.reset();
+            clearPreviewBtn.click();
+            renderMediaList();
+        } catch (err) {
+            console.error('Upload Error:', err);
+            alert('Error saving media. Please check file size and format.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;
+        }
     });
 
-    // 4. Render Media Manager List (Default + Uploaded Items)
-    function renderMediaList() {
+    // --- Render Media Manager List ---
+    async function renderMediaList() {
         const mediaList = document.getElementById('media-list');
-        const items = getGalleryItems();
+        const items = await getGalleryItems();
 
-        if (items.length === 0) {
+        if (!items || items.length === 0) {
             mediaList.innerHTML = `
                 <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
                     <i class="fas fa-images" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
@@ -194,11 +271,9 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     }
 
-    window.deleteMediaItem = function(id) {
+    window.deleteMediaItem = async function(id) {
         if (confirm('Are you sure you want to delete this media item from the website gallery?')) {
-            let items = getGalleryItems();
-            items = items.filter(item => item.id !== id);
-            localStorage.setItem('umubavu_full_gallery', JSON.stringify(items));
+            await removeGalleryItem(id);
             renderMediaList();
         }
     };
