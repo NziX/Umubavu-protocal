@@ -250,130 +250,6 @@
                 grid-template-columns: 1fr;
             }
         }
-
-        /* Portal Tabs */
-        .portal-tabs-bar {
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border-gold);
-            padding: 0;
-        }
-
-        .portal-tabs {
-            display: flex;
-            gap: 0;
-        }
-
-        .portal-tab {
-            background: none;
-            border: none;
-            border-bottom: 3px solid transparent;
-            color: var(--text-secondary);
-            font-family: var(--font-body);
-            font-size: 0.95rem;
-            font-weight: 600;
-            padding: 1.1rem 1.75rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            transition: var(--transition);
-        }
-
-        .portal-tab:hover {
-            color: var(--primary-gold-light);
-        }
-
-        .portal-tab.active {
-            color: var(--primary-gold);
-            border-bottom-color: var(--primary-gold);
-        }
-
-        .booking-badge {
-            background: var(--gold-gradient);
-            color: #000;
-            font-size: 0.72rem;
-            font-weight: 800;
-            border-radius: 999px;
-            padding: 0.1rem 0.55rem;
-            min-width: 20px;
-            text-align: center;
-        }
-
-        .portal-panel {
-            padding-top: 0;
-        }
-
-        /* Bookings card */
-        .bookings-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-gold);
-            border-radius: var(--radius-lg);
-            padding: 2.5rem;
-        }
-
-        .booking-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr auto;
-            gap: 1rem;
-            align-items: center;
-            padding: 1.1rem 1.25rem;
-            background: rgba(11, 15, 25, 0.6);
-            border: 1px solid var(--border-dark);
-            border-radius: var(--radius-md);
-            margin-bottom: 0.85rem;
-            transition: var(--transition);
-        }
-
-        .booking-row:hover {
-            border-color: var(--border-gold);
-        }
-
-        .booking-row .booking-label {
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            color: var(--primary-gold);
-            font-weight: 700;
-            margin-bottom: 0.2rem;
-        }
-
-        .booking-row .booking-value {
-            font-size: 0.95rem;
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            border-radius: var(--radius-full);
-            font-size: 0.78rem;
-            font-weight: 700;
-        }
-
-        .status-new {
-            background: rgba(212, 175, 55, 0.15);
-            color: var(--primary-gold);
-            border: 1px solid var(--border-gold);
-        }
-
-        .status-done {
-            background: rgba(37, 211, 102, 0.1);
-            color: #25D366;
-            border: 1px solid rgba(37, 211, 102, 0.3);
-        }
-
-        .booking-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        @media (max-width: 768px) {
-            .booking-row {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
     </style>
 </head>
 <body class="portal-body">
@@ -421,119 +297,79 @@
         </div>
     </header>
 
-    <!-- Portal Tab Navigation -->
-    <div class="portal-tabs-bar">
-        <div class="container">
-            <div class="portal-tabs">
-                <button class="portal-tab active" id="tab-media" onclick="switchTab('media')">
-                    <i class="fas fa-photo-video"></i> Media Gallery
-                </button>
-                <button class="portal-tab" id="tab-bookings" onclick="switchTab('bookings')">
-                    <i class="fas fa-calendar-check"></i> Event Bookings
-                    <span class="booking-badge" id="booking-badge">0</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Main Content -->
     <main class="portal-main">
         <div class="container">
-
-            <!-- ============ MEDIA TAB ============ -->
-            <div id="panel-media" class="portal-panel active-panel">
-                <div class="portal-grid">
-                    <!-- Upload Form Column -->
-                    <div class="upload-card">
-                        <div class="card-header">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <div>
-                                <h3>Upload Event Media</h3>
-                                <p style="font-size: 0.85rem; color: var(--text-secondary);">Add photos and videos of attended events directly to the website gallery.</p>
-                            </div>
-                        </div>
-
-                        <form id="upload-form">
-                            <div class="form-group" style="margin-bottom: 1.2rem;">
-                                <label for="media-title"><i class="fas fa-heading"></i> Event Title</label>
-                                <input type="text" id="media-title" placeholder="e.g. Royal Wedding Protocol - Kigali" required>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom: 1.2rem;">
-                                <label for="media-category"><i class="fas fa-folder"></i> Event Category</label>
-                                <select id="media-category" required>
-                                    <option value="weddings">💍 Weddings & Receptions</option>
-                                    <option value="galas">🎩 Galas & Corporate Dinners</option>
-                                    <option value="crowd">👥 Crowd Control & Entry Protocol</option>
-                                    <option value="vip">🌟 VIP Protocol & Ushering</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom: 1.2rem;">
-                                <label for="media-venue"><i class="fas fa-map-marker-alt"></i> Venue & Location</label>
-                                <input type="text" id="media-venue" placeholder="e.g. Kigali Convention Centre" required>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom: 1.2rem;">
-                                <label><i class="fas fa-photo-video"></i> Select Image or Video File</label>
-                                <div class="drop-zone" id="drop-zone">
-                                    <i class="fas fa-file-upload"></i>
-                                    <p><strong>Click to browse</strong> or drag & drop file here</p>
-                                    <span style="font-size: 0.8rem; color: var(--text-muted);">Supports JPG, PNG, WEBP, and MP4 files</span>
-                                    <input type="file" id="file-input" accept="image/*,video/*" style="display: none;" required>
-                                </div>
-
-                                <div class="preview-box" id="preview-box">
-                                    <button type="button" class="clear-preview" id="clear-preview"><i class="fas fa-times"></i></button>
-                                    <div id="preview-container"></div>
-                                </div>
-                            </div>
-
-                            <button type="submit" class="btn btn-gold btn-block btn-lg" id="submit-upload-btn">
-                                <i class="fas fa-paper-plane"></i> Publish to Live Gallery
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- Upload Manager Column -->
-                    <div class="manager-card">
-                        <div class="card-header">
-                            <i class="fas fa-photo-video"></i>
-                            <div>
-                                <h3>Published Event Media</h3>
-                                <p style="font-size: 0.85rem; color: var(--text-secondary);">Manage active uploads visible on the public website.</p>
-                            </div>
-                        </div>
-
-                        <div class="media-list" id="media-list">
-                            <!-- Dynamic Uploads Will Render Here -->
+            <div class="portal-grid">
+                
+                <!-- Upload Form Column -->
+                <div class="upload-card">
+                    <div class="card-header">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <div>
+                            <h3>Upload Event Media</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">Add photos and videos of attended events directly to the website gallery.</p>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- ============ BOOKINGS TAB ============ -->
-            <div id="panel-bookings" class="portal-panel" style="display:none;">
-                <div class="bookings-card">
-                    <div class="card-header" style="justify-content: space-between;">
-                        <div style="display:flex; align-items:center; gap:0.75rem;">
-                            <i class="fas fa-calendar-check"></i>
-                            <div>
-                                <h3>Event Booking Requests</h3>
-                                <p style="font-size: 0.85rem; color: var(--text-secondary);">All booking inquiries submitted through the website estimator form.</p>
+                    <form id="upload-form">
+                        <div class="form-group" style="margin-bottom: 1.2rem;">
+                            <label for="media-title"><i class="fas fa-heading"></i> Event Title</label>
+                            <input type="text" id="media-title" placeholder="e.g. Royal Wedding Protocol - Kigali" required>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.2rem;">
+                            <label for="media-category"><i class="fas fa-folder"></i> Event Category</label>
+                            <select id="media-category" required>
+                                <option value="weddings">💍 Weddings & Receptions</option>
+                                <option value="galas">🎩 Galas & Corporate Dinners</option>
+                                <option value="crowd">👥 Crowd Control & Entry Protocol</option>
+                                <option value="vip">🌟 VIP Protocol & Ushering</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.2rem;">
+                            <label for="media-venue"><i class="fas fa-map-marker-alt"></i> Venue & Location</label>
+                            <input type="text" id="media-venue" placeholder="e.g. Kigali Convention Centre" required>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.2rem;">
+                            <label><i class="fas fa-photo-video"></i> Select Image or Video File</label>
+                            <div class="drop-zone" id="drop-zone">
+                                <i class="fas fa-file-upload"></i>
+                                <p><strong>Click to browse</strong> or drag & drop file here</p>
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">Supports JPG, PNG, WEBP, and MP4 files</span>
+                                <input type="file" id="file-input" accept="image/*,video/*" style="display: none;" required>
+                            </div>
+
+                            <div class="preview-box" id="preview-box">
+                                <button type="button" class="clear-preview" id="clear-preview"><i class="fas fa-times"></i></button>
+                                <div id="preview-container"></div>
                             </div>
                         </div>
-                        <button onclick="clearAllBookings()" class="btn btn-danger" style="font-size:0.8rem; padding:0.5rem 1rem; white-space:nowrap;">
-                            <i class="fas fa-trash-alt"></i> Clear All
+
+                        <button type="submit" class="btn btn-gold btn-block btn-lg" id="submit-upload-btn">
+                            <i class="fas fa-paper-plane"></i> Publish to Live Gallery
                         </button>
+                    </form>
+                </div>
+
+                <!-- Upload Manager Column -->
+                <div class="manager-card">
+                    <div class="card-header">
+                        <i class="fas fa-photo-video"></i>
+                        <div>
+                            <h3>Published Event Media</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">Manage active uploads visible on the public website.</p>
+                        </div>
                     </div>
 
-                    <div id="bookings-list">
-                        <!-- Dynamic Bookings Render Here -->
+                    <div class="media-list" id="media-list">
+                        <!-- Dynamic Uploads Will Render Here -->
                     </div>
                 </div>
-            </div>
 
+            </div>
         </div>
     </main>
 
@@ -543,6 +379,6 @@
     </footer>
 
     <!-- Portal JavaScript -->
-    <script src="portal.js?v=4"></script>
+    <script src="portal.js?v=3"></script>
 </body>
 </html>
