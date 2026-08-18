@@ -181,11 +181,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!mediaList) return;
 
         mediaListenerUnsubscribe = db.collection('gallery_items')
-            .orderBy('createdAt', 'desc')
             .onSnapshot((snapshot) => {
                 let items = [];
                 snapshot.forEach(doc => {
                     items.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Sort client-side safely
+                items.sort((a, b) => {
+                    const timeA = a.createdAt ? (a.createdAt.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime()) : 0;
+                    const timeB = b.createdAt ? (b.createdAt.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime()) : 0;
+                    return timeB - timeA;
                 });
 
                 if (items.length === 0) {
@@ -264,11 +270,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!list) return;
 
         bookingsListenerUnsubscribe = db.collection('bookings')
-            .orderBy('createdAt', 'desc')
             .onSnapshot((snapshot) => {
                 let bookings = [];
                 snapshot.forEach(doc => {
                     bookings.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Sort client-side safely
+                bookings.sort((a, b) => {
+                    const timeA = a.createdAt ? (a.createdAt.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime()) : 0;
+                    const timeB = b.createdAt ? (b.createdAt.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime()) : 0;
+                    return timeB - timeA;
                 });
 
                 if (badge) {

@@ -225,25 +225,56 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 'def_6', title: 'Team Briefing & Readiness', venue: 'Unmatched Professionalism', type: 'image', url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80' }
         ];
 
-        // Real-time Firestore sync
-        db.collection('gallery_items').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+        // Real-time Firestore sync with client-side sorting and one-time initialization flag
+        const configRef = db.collection('config').doc('initialization');
+
+        db.collection('gallery_items').onSnapshot(async (snapshot) => {
             let items = [];
             snapshot.forEach(doc => {
                 items.push({ id: doc.id, ...doc.data() });
             });
 
-            // If empty (e.g. fresh database), load defaults to Firestore
-            if (items.length === 0) {
-                DEFAULT_ITEMS.forEach(async (item) => {
-                    await db.collection('gallery_items').doc(item.id).set({
-                        title: item.title,
-                        venue: item.venue,
-                        type: item.type,
-                        url: item.url,
-                        isDefault: true,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            // Check config to see if we've ever initialized the defaults
+            try {
+                const configDoc = await configRef.get();
+                if (!configDoc.exists && items.length === 0) {
+                    // Mark as initialized first to prevent multiple writes
+                    await configRef.set({
+                        initialized: true,
+                        initializedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                });
+
+                    // Add default items to database
+                    DEFAULT_ITEMS.forEach(async (item) => {
+                        await db.collection('gallery_items').doc(item.id).set({
+                            title: item.title,
+                            venue: item.venue,
+                            type: item.type,
+                            url: item.url,
+                            isDefault: true,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    });
+                    return;
+                }
+            } catch (err) {
+                console.warn("Failed database default check/init (likely permission/offline):", err);
+            }
+
+            // Sort client-side safely (handles missing/server timestamps)
+            items.sort((a, b) => {
+                const timeA = a.createdAt ? (a.createdAt.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime()) : 0;
+                const timeB = b.createdAt ? (b.createdAt.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime()) : 0;
+                return timeB - timeA; // Newest first
+            });
+
+            if (items.length === 0) {
+                galleryGrid.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-secondary);">
+                        <i class="fas fa-camera-retro" style="font-size: 2.5rem; color: var(--primary-gold); margin-bottom: 1rem;"></i>
+                        <p>New event photos and videos coming soon!</p>
+                    </div>
+                `;
                 return;
             }
 
