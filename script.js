@@ -230,10 +230,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         `;
                     } else {
-                        galleryGrid.innerHTML = items.map(item => `
-                            <div class="gallery-item">
+                        galleryGrid.innerHTML = items.map((item, index) => `
+                            <div class="gallery-item" data-index="${index}" style="cursor:pointer;">
                                 ${item.type === 'video'
-                                    ? `<video src="${item.url}" controls preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video>`
+                                    ? `<video src="${item.url}" preload="metadata" style="width:100%;height:100%;object-fit:cover;pointer-events:none;"></video><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:50px;height:50px;border-radius:50%;background:rgba(212,175,55,0.85);color:#000;display:flex;align-items:center;justify-content:center;font-size:1.2rem;box-shadow:0 4px 15px rgba(0,0,0,0.5);"><i class="fas fa-play" style="margin-left:3px;"></i></div>`
                                     : `<img src="${item.url}" alt="${escapeHtml(item.title)}">`
                                 }
                                 <div class="gallery-overlay">
@@ -242,6 +242,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                         `).join('');
+
+                        // Attach click listeners to open Lightbox
+                        document.querySelectorAll('.gallery-item').forEach((card, idx) => {
+                            card.addEventListener('click', () => {
+                                openLightbox(items[idx]);
+                            });
+                        });
                     }
                 };
             } catch (err) {
@@ -251,6 +258,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadPublicGallery();
     }
+
+    // 8. Fullscreen Lightbox Modal Controls
+    const lightboxModal = document.getElementById('lightbox-modal');
+    const lightboxContent = document.getElementById('lightbox-content');
+    const lightboxCaption = document.getElementById('lightbox-caption');
+    const lightboxClose = document.getElementById('lightbox-close');
+
+    function openLightbox(item) {
+        if (!lightboxModal) return;
+
+        if (item.type === 'video') {
+            lightboxContent.innerHTML = `<video src="${item.url}" controls autoplay style="max-height: 75vh; width: 100%; border-radius: 12px;"></video>`;
+        } else {
+            lightboxContent.innerHTML = `<img src="${item.url}" alt="${escapeHtml(item.title)}" style="max-height: 75vh; max-width: 100%; object-fit: contain; border-radius: 12px;">`;
+        }
+
+        lightboxCaption.innerHTML = `
+            <h3>${escapeHtml(item.title)}</h3>
+            <p><i class="fas fa-map-marker-alt" style="color:var(--primary-gold);"></i> ${escapeHtml(item.venue)}</p>
+        `;
+
+        lightboxModal.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent scrolling
+    }
+
+    function closeLightbox() {
+        if (!lightboxModal) return;
+        lightboxModal.classList.remove('active');
+        lightboxContent.innerHTML = '';
+        lightboxCaption.innerHTML = '';
+        document.body.style.overflow = '';
+    }
+
+    if (lightboxClose) {
+        lightboxClose.addEventListener('click', closeLightbox);
+    }
+
+    if (lightboxModal) {
+        lightboxModal.addEventListener('click', (e) => {
+            if (e.target === lightboxModal) {
+                closeLightbox();
+            }
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && lightboxModal && lightboxModal.classList.contains('active')) {
+            closeLightbox();
+        }
+    });
 
     function escapeHtml(str) {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
