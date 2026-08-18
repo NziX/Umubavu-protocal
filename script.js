@@ -175,4 +175,31 @@ document.addEventListener('DOMContentLoaded', () => {
             window.open(targetUrl, '_blank');
         });
     }
+
+    // 7. Load Technician Uploaded Media into Gallery
+    const galleryGrid = document.getElementById('gallery-grid');
+    if (galleryGrid) {
+        const uploads = JSON.parse(localStorage.getItem('umubavu_gallery_uploads') || '[]');
+        if (uploads.length > 0) {
+            const uploadedHtml = uploads.map(item => `
+                <div class="gallery-item" style="border-color: var(--border-gold);">
+                    ${item.type === 'video'
+                        ? `<video src="${item.url}" controls style="width:100%;height:100%;object-fit:cover;"></video>`
+                        : `<img src="${item.url}" alt="${escapeHtml(item.title)}">`
+                    }
+                    <div class="gallery-overlay">
+                        <h4>${escapeHtml(item.title)}</h4>
+                        <p><i class="fas fa-map-marker-alt" style="color:var(--primary-gold);"></i> ${escapeHtml(item.venue)}</p>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Prepend technician uploads to existing default gallery
+            galleryGrid.insertAdjacentHTML('afterbegin', uploadedHtml);
+        }
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
 });
