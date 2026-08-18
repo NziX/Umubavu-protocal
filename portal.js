@@ -312,6 +312,78 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ============================================================
+    // ABOUT SECTION IMAGE CHANGER
+    // ============================================================
+    const aboutImgBtn = document.getElementById('about-img-btn');
+    const aboutImgInput = document.getElementById('about-img-input');
+    const aboutImgCurrent = document.getElementById('about-img-current');
+    const DEFAULT_ABOUT_IMAGE = 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80';
+
+    // Load current about image from Firestore
+    db.collection('site_config').doc('about_image').get().then((doc) => {
+        if (doc.exists && doc.data().url) {
+            aboutImgCurrent.src = doc.data().url;
+        } else {
+            aboutImgCurrent.src = DEFAULT_ABOUT_IMAGE;
+        }
+    }).catch(() => {
+        aboutImgCurrent.src = DEFAULT_ABOUT_IMAGE;
+    });
+
+    aboutImgBtn.addEventListener('click', () => aboutImgInput.click());
+
+    aboutImgInput.addEventListener('change', async (e) => {
+        if (e.target.files.length === 0) return;
+        const file = e.target.files[0];
+
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file (JPG, PNG, WEBP).');
+            return;
+        }
+
+        aboutImgBtn.disabled = true;
+        aboutImgBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Compressing...`;
+
+        try {
+            // Compress to base64 data URL
+            const dataUrl = await compressImageToDataUrl(file, 1200, 0.70);
+
+            if (!dataUrl) {
+                throw new Error('Failed to process image.');
+            }
+
+            // Check size
+            if (dataUrl.length > 900000) {
+                const smallerUrl = await compressImageToDataUrl(file, 800, 0.50);
+                if (!smallerUrl || smallerUrl.length > 900000) {
+                    alert('Image is too large. Please use a smaller or lower-resolution photo.');
+                    return;
+                }
+                await saveAboutImage(smallerUrl);
+            } else {
+                await saveAboutImage(dataUrl);
+            }
+
+            async function saveAboutImage(imageUrl) {
+                aboutImgBtn.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Saving...`;
+                await db.collection('site_config').doc('about_image').set({
+                    url: imageUrl,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                aboutImgCurrent.src = imageUrl;
+                alert('✅ "Who We Are" photo updated! It is now live on the homepage.');
+            }
+        } catch (err) {
+            console.error('About image error:', err);
+            alert('Error: ' + err.message);
+        } finally {
+            aboutImgBtn.disabled = false;
+            aboutImgBtn.innerHTML = `<i class="fas fa-camera"></i> Choose New Photo`;
+            aboutImgInput.value = '';
+        }
+    });
+
+    // ============================================================
     // CLOUD BOOKINGS SECTION (Firestore Sync)
     // ============================================================
     let bookingsListenerUnsubscribe = null;

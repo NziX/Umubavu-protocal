@@ -305,6 +305,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 7.5 Load dynamic "Who We Are" image
+    const aboutSectionImg = document.getElementById('about-section-img');
+    if (aboutSectionImg) {
+        db.collection('site_config').doc('about_image').onSnapshot((doc) => {
+            if (doc.exists && doc.data().url) {
+                aboutSectionImg.src = doc.data().url;
+            }
+        }, (err) => {
+            console.error('Error loading about image:', err);
+        });
+    }
+
     // 8. Fullscreen Lightbox Modal Controls
     const lightboxModal = document.getElementById('lightbox-modal');
     const lightboxContent = document.getElementById('lightbox-content');
