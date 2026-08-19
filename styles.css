@@ -1388,4 +1388,52 @@ img {
     background: rgba(7, 9, 15, 0.9);
 }
 
+/* Testimonial Invite Banner Styles */
+.testimonial-invite-banner {
+    background: linear-gradient(135deg, #161e38 0%, #0b0f19 100%);
+    border-bottom: 2px solid var(--border-gold);
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    position: sticky;
+    top: 0;
+    z-index: 10001; /* Above navbar sticky */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.banner-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.banner-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.banner-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: var(--transition);
+}
+
+.banner-close-btn:hover {
+    color: #ff6b6b;
+}
+
+.btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    border-radius: var(--radius-sm);
+}
+
+
 

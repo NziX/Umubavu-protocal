@@ -148,6 +148,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         contacted: false,
                         submittedAt: new Date().toLocaleString('en-GB'),
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }).then(() => {
+                        // Store booking details in localStorage to prompt them for testimonials later
+                        localStorage.setItem('umubavu_booking_made', 'true');
+                        localStorage.setItem('umubavu_client_name', clientName);
+                        localStorage.setItem('umubavu_client_role', `${eventType} Host`);
                     }).catch(err => console.error("Error saving booking to Firestore: ", err));
                 }
             } catch (err) {
@@ -496,6 +501,19 @@ document.addEventListener('DOMContentLoaded', () => {
         openTestimonialBtn.addEventListener('click', () => {
             testimonialModal.classList.add('active');
             document.body.style.overflow = 'hidden';
+
+            // Auto pre-fill if client has booking info saved
+            const nameInput = document.getElementById('testimonial-name');
+            const roleInput = document.getElementById('testimonial-role');
+            const savedName = localStorage.getItem('umubavu_client_name');
+            const savedRole = localStorage.getItem('umubavu_client_role');
+
+            if (nameInput && savedName && !nameInput.value) {
+                nameInput.value = savedName;
+            }
+            if (roleInput && savedRole && !roleInput.value) {
+                roleInput.value = savedRole;
+            }
         });
     }
 
@@ -551,6 +569,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
+                // Set testimonial completed state in browser so banner disappears
+                localStorage.setItem('umubavu_testimonial_submitted', 'true');
+                if (inviteBanner) {
+                    inviteBanner.style.display = 'none';
+                }
+
                 alert('Thank you! Your testimonial has been submitted successfully and is awaiting review by our team.');
                 closeTestimonial();
             } catch (err) {
@@ -561,6 +585,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 submitBtn.innerHTML = `Submit Review`;
             }
         });
+    }
+
+    // --- Booking Testimonial Invite Banner Logic ---
+    const inviteBanner = document.getElementById('booking-testimonial-banner');
+    const bannerWriteBtn = document.getElementById('banner-write-btn');
+    const bannerCloseBtn = document.getElementById('banner-close-btn');
+
+    if (inviteBanner) {
+        const hasBooked = localStorage.getItem('umubavu_booking_made') === 'true';
+        const hasWrittenReview = localStorage.getItem('umubavu_testimonial_submitted') === 'true';
+
+        if (hasBooked && !hasWrittenReview) {
+            inviteBanner.style.display = 'block';
+        }
+
+        if (bannerCloseBtn) {
+            bannerCloseBtn.addEventListener('click', () => {
+                inviteBanner.style.display = 'none';
+                localStorage.setItem('umubavu_booking_made', 'dismissed'); // Don't show again in this session
+            });
+        }
+
+        if (bannerWriteBtn) {
+            bannerWriteBtn.addEventListener('click', () => {
+                inviteBanner.style.display = 'none';
+                if (testimonialModal) {
+                    testimonialModal.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+
+                    // Pre-fill name and event details
+                    const nameInput = document.getElementById('testimonial-name');
+                    const roleInput = document.getElementById('testimonial-role');
+                    const savedName = localStorage.getItem('umubavu_client_name');
+                    const savedRole = localStorage.getItem('umubavu_client_role');
+
+                    if (nameInput && savedName) nameInput.value = savedName;
+                    if (roleInput && savedRole) roleInput.value = savedRole;
+                }
+            });
+        }
     }
 
     function escapeHtml(str) {
