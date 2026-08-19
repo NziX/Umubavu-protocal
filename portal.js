@@ -130,7 +130,42 @@ document.addEventListener('DOMContentLoaded', () => {
         dropZone.style.display = 'block';
     });
 
-    // --- Image Compression Utility (returns base64 data URL) ---
+    // --- Image Compression Utility (returns File blob) ---
+    function compressImage(file, maxWidth, quality) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if (w > maxWidth) {
+                    h = Math.round(h * maxWidth / w);
+                    w = maxWidth;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        resolve(new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        }));
+                    } else {
+                        resolve(file);
+                    }
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                resolve(file); // Fallback: return original if compression fails
+            };
+            img.src = url;
+        });
+    }
+
+    // --- Image Compression Utility for About Image (returns base64 data URL) ---
     function compressImageToDataUrl(file, maxWidth, quality) {
         return new Promise((resolve) => {
             const img = new Image();
@@ -151,7 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             img.onerror = () => {
                 URL.revokeObjectURL(url);
-                // Fallback: read original file as data URL
                 const reader = new FileReader();
                 reader.onload = (e) => resolve(e.target.result);
                 reader.onerror = () => resolve(null);
@@ -161,7 +195,62 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Media Upload Submission (direct to Firestore — no Firebase Storage needed) ---
+    // --- Cloudinary Upload Helper ---
+    function uploadToCloudinary(file, fileType) {
+        const cloudName = cloudinaryConfig.cloudName;
+        const uploadPreset = cloudinaryConfig.uploadPreset;
+
+        if (!cloudName || cloudName === "YOUR_CLOUDINARY_CLOUD_NAME" || !uploadPreset || uploadPreset === "YOUR_CLOUDINARY_UPLOAD_PRESET") {
+            throw new Error("Cloudinary configuration is missing. Click 'Publish to Live Gallery' and follow the setup instructions.");
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', uploadPreset);
+        formData.append('resource_type', fileType === 'video' ? 'video' : 'image');
+
+        const url = `https://api.cloudinary.com/v1_1/${cloudName}/upload`;
+
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+
+            // Live progress tracker
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    const mbDone = (e.loaded / 1024 / 1024).toFixed(1);
+                    const mbTotal = (e.total / 1024 / 1024).toFixed(1);
+                    submitBtn.innerHTML = `
+                        <div style="width:100%;text-align:center;">
+                            <div style="margin-bottom:4px;font-size:0.85rem;">Uploading to Cloudinary: ${mbDone} / ${mbTotal} MB</div>
+                            <div style="background:rgba(0,0,0,0.3);border-radius:6px;height:8px;overflow:hidden;">
+                                <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#d4af37,#f0d060);border-radius:6px;transition:width 0.3s;"></div>
+                            </div>
+                            <div style="margin-top:3px;font-size:0.75rem;opacity:0.8;">${pct}%</div>
+                        </div>`;
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    resolve(response.secure_url);
+                } else {
+                    const errResponse = JSON.parse(xhr.responseText || "{}");
+                    reject(new Error(errResponse.error?.message || `Upload failed with status ${xhr.status}`));
+                }
+            };
+
+            xhr.onerror = () => {
+                reject(new Error('Network error during upload to Cloudinary.'));
+            };
+
+            xhr.send(formData);
+        });
+    }
+
+    // --- Media Upload Submission (Direct to Cloudinary & Firestore metadata) ---
     const uploadForm = document.getElementById('upload-form');
 
     uploadForm.addEventListener('submit', async (e) => {
@@ -172,70 +261,63 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Block videos — Firestore has a 1MB document limit, videos are too large
-        if (currentFileType === 'video') {
-            alert('⚠️ Video uploads are not supported on the free plan.\n\nOnly photos can be uploaded. To share event videos, upload them to YouTube or Instagram and link them from there.');
+        const cloudName = cloudinaryConfig.cloudName;
+        const uploadPreset = cloudinaryConfig.uploadPreset;
+
+        // Check if configuration placeholders are still active
+        if (!cloudName || cloudName === "YOUR_CLOUDINARY_CLOUD_NAME" || !uploadPreset || uploadPreset === "YOUR_CLOUDINARY_UPLOAD_PRESET") {
+            alert(
+                '⚠️ Cloudinary Account Configuration Needed!\n\n' +
+                'To enable free image and video uploads, follow these 3 quick steps:\n' +
+                '1. Sign up for a free account at: cloudinary.com\n' +
+                '2. Find your "Cloud Name" on your dashboard.\n' +
+                '3. Go to Settings → Upload tab → Add upload preset. Set "Signing Mode" to "Unsigned" and click Save.\n' +
+                '4. Open the file "firebase-config.js" in your website folder, replace the values inside the cloudinaryConfig section, and save.\n\n' +
+                'Once saved, uploads will work automatically!'
+            );
             return;
         }
 
         submitBtn.disabled = true;
-        submitBtn.innerHTML = `<i class="fas fa-compress"></i> Compressing image...`;
 
         try {
             const title = document.getElementById('media-title').value.trim();
             const category = document.getElementById('media-category').value;
             const venue = document.getElementById('media-venue').value.trim();
 
-            // Compress image to base64 data URL (max 1200px wide, 70% quality)
-            const originalSize = selectedFile.size;
-            const dataUrl = await compressImageToDataUrl(selectedFile, 1200, 0.70);
+            let fileToUpload = selectedFile;
 
-            if (!dataUrl) {
-                throw new Error('Failed to process image. Please try a different file.');
-            }
-
-            // Check size — Firestore documents max at ~1MB
-            const dataSize = dataUrl.length;
-            const dataSizeMB = (dataSize / 1024 / 1024).toFixed(2);
-            console.log(`Compressed: ${(originalSize/1024/1024).toFixed(1)}MB → ${dataSizeMB}MB data URL`);
-
-            if (dataSize > 900000) {
-                // Try harder compression
-                submitBtn.innerHTML = `<i class="fas fa-compress"></i> Extra compression...`;
-                const smallerDataUrl = await compressImageToDataUrl(selectedFile, 800, 0.50);
-                if (smallerDataUrl && smallerDataUrl.length <= 900000) {
-                    // Use the smaller version
-                    await saveToFirestore(smallerDataUrl);
-                } else {
-                    alert('This image is too large even after compression. Please use a smaller photo or crop it before uploading.');
-                    return;
-                }
+            // Compress images client-side before sending to Cloudinary
+            if (currentFileType === 'image') {
+                submitBtn.innerHTML = `<i class="fas fa-compress"></i> Compressing image...`;
+                fileToUpload = await compressImage(selectedFile, 1600, 0.75);
             } else {
-                await saveToFirestore(dataUrl);
+                submitBtn.innerHTML = `<i class="fas fa-video"></i> Preparing video...`;
             }
 
-            async function saveToFirestore(imageDataUrl) {
-                submitBtn.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Saving to database...`;
+            // Upload directly to Cloudinary
+            const secureUrl = await uploadToCloudinary(fileToUpload, currentFileType);
 
-                const fileId = 'up_' + Date.now();
-                await db.collection('gallery_items').doc(fileId).set({
-                    title: title,
-                    category: category,
-                    venue: venue,
-                    type: 'image',
-                    url: imageDataUrl,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+            // Save metadata and Cloudinary URL to Firestore
+            submitBtn.innerHTML = `<i class="fas fa-check"></i> Saving metadata...`;
+            const fileId = 'up_' + Date.now();
+            await db.collection('gallery_items').doc(fileId).set({
+                title: title,
+                category: category,
+                venue: venue,
+                type: currentFileType,
+                url: secureUrl,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-                alert('✅ Photo published successfully! It is now live on the website gallery.');
+            alert(`✅ ${currentFileType === 'video' ? 'Video' : 'Photo'} published successfully! It is now live on the website gallery.`);
 
-                // Reset form UI
-                uploadForm.reset();
-                clearPreviewBtn.click();
-            }
+            // Reset form UI
+            uploadForm.reset();
+            clearPreviewBtn.click();
         } catch (err) {
             console.error('Upload Error:', err);
-            alert('Error saving: ' + err.message);
+            alert('Upload failed: ' + err.message);
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Publish to Live Gallery`;

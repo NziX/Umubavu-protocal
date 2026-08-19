@@ -12,3 +12,9 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore(app);
+
+// Cloudinary configuration (Free Media Storage)
+const cloudinaryConfig = {
+  cloudName: "YOUR_CLOUDINARY_CLOUD_NAME",
+  uploadPreset: "YOUR_CLOUDINARY_UPLOAD_PRESET"
+};
